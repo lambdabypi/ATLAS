@@ -1,0 +1,184 @@
+[
+	{
+		"id": "guide1",
+		"title": "Management of Acute Respiratory Infections",
+		"category": "Respiratory",
+		"content": {
+			"overview": "This guideline covers the assessment and management of acute respiratory infections in resource-limited settings.",
+			"assessment": [
+				"Assess for danger signs: inability to drink, severe chest indrawing, stridor in calm child",
+				"Check respiratory rate and temperature",
+				"Assess for chest indrawing and auscultate if possible"
+			],
+			"management": [
+				"Mild: Home treatment with supportive care",
+				"Moderate: Amoxicillin for 5 days",
+				"Severe: Refer to hospital if possible, start antibiotics before transfer"
+			],
+			"followUp": "Follow up in 2 days if not improving, immediately if worsening"
+		},
+		"lastUpdated": "2024-07-15T00:00:00.000Z"
+	},
+	{
+		"id": "guide2",
+		"title": "Management of Acute Diarrhea",
+		"category": "Gastrointestinal",
+		"content": {
+			"overview": "This guideline covers the assessment and management of acute diarrhea, focusing on preventing dehydration in resource-limited settings.",
+			"assessment": [
+				"Assess for dehydration: sunken eyes, skin pinch, decreased urination",
+				"Check for blood in stool, fever, duration of symptoms",
+				"Assess for malnutrition which increases risk"
+			],
+			"management": [
+				"Rehydration: ORS for mild to moderate dehydration",
+				"Zinc supplementation for 10-14 days for all children with diarrhea",
+				"Antibiotics only if bloody diarrhea or suspected cholera",
+				"Continue feeding during illness"
+			],
+			"redFlags": [
+				"Severe dehydration (lethargy, very dry mouth, very sunken eyes)",
+				"Persistent vomiting preventing oral rehydration",
+				"High fever (>39°C) with bloody diarrhea"
+			],
+			"followUp": "Return immediately if unable to drink, persistent vomiting, or signs of dehydration worsen"
+		},
+		"lastUpdated": "2024-06-30T00:00:00.000Z"
+	},
+	{
+		"id": "guide3",
+		"title": "Diagnosis and Management of Malaria",
+		"category": "Infectious Disease",
+		"content": {
+			"overview": "This guideline covers the diagnosis and management of malaria in resource-limited settings, with focus on high-risk groups.",
+			"assessment": [
+				"Clinical suspicion: fever, headache, body aches, fatigue",
+				"Confirm diagnosis with RDT (Rapid Diagnostic Test) if available",
+				"Assess for severe malaria: altered consciousness, respiratory distress, severe anemia, jaundice"
+			],
+			"management": {
+				"uncomplicated": [
+					"Artemisinin-based Combination Therapy (ACT) for 3 days",
+					"Paracetamol for fever",
+					"Ensure adequate fluid intake"
+				],
+				"severe": [
+					"IM artesunate if available, or IM artemether",
+					"If referral will be delayed >6 hours, give first dose of antimalarial before transfer",
+					"Manage complications: hypoglycemia, seizures, anemia as resources allow"
+				],
+				"prevention": [
+					"Insecticide-treated bed nets",
+					"Intermittent preventive treatment for pregnant women",
+					"Seasonal malaria chemoprevention for children where applicable"
+				]
+			},
+			"highRiskGroups": [
+				"Children under 5 years",
+				"Pregnant women",
+				"HIV-positive individuals",
+				"Non-immune travelers to endemic areas"
+			],
+			"followUp": "Return for reassessment if fever persists after 2 days of treatment"
+		},
+		"lastUpdated": "2024-07-20T00:00:00.000Z"
+	},
+	{
+		"id": "guide4",
+		"title": "Hypertension Management",
+		"category": "Cardiovascular",
+		"content": {
+			"overview": "Simplified guideline for hypertension management in resource-limited settings with focus on essential medications and monitoring.",
+			"diagnosis": [
+				"BP ≥140/90 mmHg on at least two separate occasions",
+				"Check for target organ damage if possible: fundoscopy, urine dipstick for protein",
+				"Basic risk assessment: smoking, diabetes, age, previous cardiovascular events"
+			],
+			"riskStratification": {
+				"lowRisk": "No risk factors, BP 140-159/90-99",
+				"mediumRisk": "1-2 risk factors, BP 160-179/100-109",
+				"highRisk": "≥3 risk factors, BP ≥180/110, or established cardiovascular disease, diabetes, or renal disease"
+			},
+			"management": [
+				"Lifestyle modifications for all patients: salt reduction, physical activity, healthy diet, smoking cessation",
+				"First-line medications: thiazide diuretic, calcium channel blocker, or ACE inhibitor based on availability",
+				"Start with single drug and low dose, titrate upward if needed",
+				"Two-drug combination for BP ≥160/100 or high-risk patients",
+				"For severe hypertension (≥180/110): immediate treatment and consider referral if available"
+			],
+			"monitoring": [
+				"BP check every 1-3 months until target reached, then every 3-6 months",
+				"Basic lab tests if available: creatinine, potassium, glucose yearly",
+				"Target BP <140/90 mmHg for most patients, <130/80 for high-risk patients"
+			],
+			"followUp": "Regular follow-up essential for medication adjustment and adherence support"
+		},
+		"lastUpdated": "2024-05-15T00:00:00.000Z"
+	},
+	{
+		"id": "guide5",
+		"title": "Maternal Care: Antenatal and Delivery",
+		"category": "Maternal Health",
+		"content": {
+			"overview": "Essential antenatal care and delivery guidelines for resource-limited settings to reduce maternal and perinatal mortality.",
+			"antenatalCare": {
+				"scheduling": [
+					"First visit: Before 12 weeks if possible",
+					"Minimum 4 visits: <12 weeks, 24-28 weeks, 32 weeks, 36 weeks",
+					"More frequent for high-risk pregnancies"
+				],
+				"essentialAssessments": [
+					"BP measurement at every visit",
+					"Fundal height measurement after 24 weeks",
+					"Fetal heart rate auscultation after 20 weeks",
+					"Hemoglobin testing at least once (first visit and 36 weeks if possible)",
+					"Urine dipstick for protein if available, especially with hypertension",
+					"HIV and syphilis testing at first visit"
+				],
+				"preventiveInterventions": [
+					"Tetanus toxoid immunization",
+					"Iron and folate supplementation",
+					"Intermittent preventive treatment for malaria in endemic areas",
+					"Deworming after first trimester in endemic areas"
+				]
+			},
+			"dangerSigns": [
+				"Vaginal bleeding",
+				"Convulsions/fits",
+				"Severe headache with blurred vision",
+				"Fever and too weak to get out of bed",
+				"Severe abdominal pain",
+				"Fast or difficult breathing",
+				"Reduced or absent fetal movements"
+			],
+			"delivery": {
+				"preparations": [
+					"Clean delivery kit: soap, clean blade, cord ties, clean cloths",
+					"Identify transport options for emergencies",
+					"Plan for skilled birth attendant"
+				],
+				"monitoringLabor": [
+					"Use partograph if available",
+					"Monitor maternal vital signs",
+					"Monitor fetal heart rate every 30 minutes in first stage, every 5 minutes in second stage"
+				],
+				"postpartumCare": [
+					"Monitor for bleeding in first 24 hours",
+					"Ensure breastfeeding initiated within first hour",
+					"Check mother and newborn before discharge"
+				]
+			},
+			"emergencyReferralCriteria": [
+				"Obstructed labor: no progress for >4 hours in active phase",
+				"Antepartum or postpartum hemorrhage",
+				"Pre-eclampsia/eclampsia: BP ≥140/90 with proteinuria or symptoms",
+				"Fetal distress: heart rate <120 or >160 bpm",
+				"Prolapsed cord",
+				"Malpresentation (transverse lie, breech if provider not skilled)",
+				"Maternal exhaustion or dehydration"
+			],
+			"followUp": "Postnatal visit within 48 hours, at 7 days, and at 6 weeks for mother and baby"
+		},
+		"lastUpdated": "2024-06-10T00:00:00.000Z"
+	}
+]

@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ATLAS Research Experiment Tracking Framework</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			margin: 20px;
+			line-height: 1.6;
+			color: #333;
+			background-color: #f5f5f5;
+		}
+
+		.container {
+			max-width: 1400px;
+			margin: 0 auto;
+			background: white;
+			padding: 30px;
+			border-radius: 8px;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		}
+
+		h1,
+		h2,
+		h3 {
+			color: #2c5aa0;
+			margin-top: 30px;
+		}
+
+		h1 {
+			text-align: center;
+			border-bottom: 3px solid #2c5aa0;
+			padding-bottom: 10px;
+		}
+
+		.section {
+			margin: 30px 0;
+			padding: 20px;
+			border: 1px solid #ddd;
+			border-radius: 5px;
+			background: #fafafa;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			margin: 15px 0;
+			font-size: 11px;
+			background: white;
+		}
+
+		th,
+		td {
+			border: 1px solid #ddd;
+			padding: 8px;
+			text-align: left;
+			vertical-align: top;
+		}
+
+		th {
+			background-color: #2c5aa0;
+			color: white;
+			font-weight: bold;
+		}
+
+		.high-priority {
+			background-color: #ffebee;
+		}
+
+		.medium-priority {
+			background-color: #fff3e0;
+		}
+
+		.low-priority {
+			background-color: #e8f5e8;
+		}
+
+		.metric-target {
+			font-weight: bold;
+			color: #1976d2;
+		}
+
+		.status-pending {
+			color: #ff9800;
+			font-weight: bold;
+		}
+
+		.status-progress {
+			color: #2196f3;
+			font-weight: bold;
+		}
+
+		.status-complete {
+			color: #4caf50;
+			font-weight: bold;
+		}
+
+		.download-note {
+			background: #e3f2fd;
+			padding: 15px;
+			border-left: 4px solid #2196f3;
+			margin: 20px 0;
+			border-radius: 0 4px 4px 0;
+		}
+
+		.category {
+			font-weight: bold;
+			background-color: #e1f5fe;
+			text-align: center;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>ATLAS Research Experiment Tracking Framework</h1>
+
+		<div class="download-note">
+			<strong>How to use this framework:</strong><br>
+			1. Copy the tables below into Excel/Google Sheets<br>
+			2. Use the tracking columns to monitor progress<br>
+			3. Update metrics as you complete experiments<br>
+			4. Use conditional formatting to highlight priorities<br>
+			5. Generate reports from completed experiments
+		</div>
+
+		<div class="section">
+			<h2>1. Master Experiment Registry</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Exp ID</th>
+						<th>Category</th>
+						<th>Experiment Name</th>
+						<th>Research Question</th>
+						<th>Priority</th>
+						<th>Status</th>
+						<th>Week Planned</th>
+						<th>Resources Needed</th>
+						<th>Dependencies</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="category">
+						<td colspan="9">TECHNICAL PERFORMANCE EXPERIMENTS</td>
+					</tr>
+					<tr class="high-priority">
+						<td>TP001</td>
+						<td>Performance</td>
+						<td>Offline Response Time Analysis</td>
+						<td>Does offline mode meet &lt;2s response target?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>5</td>
+						<td>Test devices, network simulator</td>
+						<td>Core app completion</td>
+					</tr>
+					<tr class="high-priority">
+						<td>TP002</td>
+						<td>Performance</td>
+						<td>Battery Consumption Testing</td>
+						<td>Does app achieve &lt;10% daily battery usage?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>6</td>
+						<td>Multiple device types</td>
+						<td>TP001</td>
+					</tr>
+					<tr class="medium-priority">
+						<td>TP003</td>
+						<td>Storage</td>
+						<td>Data Storage Efficiency</td>
+						<td>Can system operate within 500MB limit?</td>
+						<td>Medium</td>
+						<td class="status-pending">Pending</td>
+						<td>6</td>
+						<td>Storage monitoring tools</td>
+						<td>Clinical data integration</td>
+					</tr>
+					<tr class="high-priority">
+						<td>TP004</td>
+						<td>Sync</td>
+						<td>Bandwidth Optimization</td>
+						<td>Does sync stay under 5MB daily target?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>8</td>
+						<td>Network throttling tools</td>
+						<td>Sync implementation</td>
+					</tr>
+					<tr class="category">
+						<td colspan="9">AI ACCURACY & BIAS EXPERIMENTS</td>
+					</tr>
+					<tr class="high-priority">
+						<td>AI001</td>
+						<td>Accuracy</td>
+						<td>Diagnostic Accuracy Assessment</td>
+						<td>Does AI achieve &gt;80% diagnostic accuracy?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>10</td>
+						<td>Clinical expert panel</td>
+						<td>AI integration complete</td>
+					</tr>
+					<tr class="high-priority">
+						<td>AI002</td>
+						<td>Bias</td>
+						<td>Gender Bias Detection</td>
+						<td>Are recommendations biased by patient gender?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>11</td>
+						<td>Diverse test cases</td>
+						<td>AI001</td>
+					</tr>
+					<tr class="high-priority">
+						<td>AI003</td>
+						<td>Bias</td>
+						<td>Age Bias Detection</td>
+						<td>Are recommendations biased by patient age?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>11</td>
+						<td>Age-diverse test cases</td>
+						<td>AI001</td>
+					</tr>
+					<tr class="medium-priority">
+						<td>AI004</td>
+						<td>Confidence</td>
+						<td>Confidence Scoring Accuracy</td>
+						<td>Do confidence scores correlate with accuracy?</td>
+						<td>Medium</td>
+						<td class="status-pending">Pending</td>
+						<td>12</td>
+						<td>Statistical analysis tools</td>
+						<td>AI001, AI002, AI003</td>
+					</tr>
+					<tr class="category">
+						<td colspan="9">USABILITY & WORKFLOW EXPERIMENTS</td>
+					</tr>
+					<tr class="high-priority">
+						<td>UX001</td>
+						<td>Usability</td>
+						<td>SUS Score Evaluation</td>
+						<td>Does system achieve SUS score &gt;70?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>14</td>
+						<td>Healthcare provider participants</td>
+						<td>UI implementation</td>
+					</tr>
+					<tr class="high-priority">
+						<td>UX002</td>
+						<td>Efficiency</td>
+						<td>Task Completion Time</td>
+						<td>30% faster workflow vs. paper-based?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>15</td>
+						<td>Timing tools, control group</td>
+						<td>UX001</td>
+					</tr>
+					<tr class="medium-priority">
+						<td>UX003</td>
+						<td>Voice</td>
+						<td>Voice Input Accuracy</td>
+						<td>Voice recognition accuracy in clinical settings?</td>
+						<td>Medium</td>
+						<td class="status-pending">Pending</td>
+						<td>16</td>
+						<td>Noisy environment setup</td>
+						<td>Voice feature implementation</td>
+					</tr>
+					<tr class="category">
+						<td colspan="9">CLINICAL VALIDATION EXPERIMENTS</td>
+					</tr>
+					<tr class="high-priority">
+						<td>CV001</td>
+						<td>Guidelines</td>
+						<td>WHO Guideline Adherence</td>
+						<td>Do recommendations follow WHO protocols?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>13</td>
+						<td>WHO guideline database</td>
+						<td>Clinical content integration</td>
+					</tr>
+					<tr class="high-priority">
+						<td>CV002</td>
+						<td>Safety</td>
+						<td>Clinical Safety Assessment</td>
+						<td>Are recommendations clinically safe?</td>
+						<td>High</td>
+						<td class="status-pending">Pending</td>
+						<td>13</td>
+						<td>Clinical safety experts</td>
+						<td>CV001</td>
+					</tr>
+					<tr class="medium-priority">
+						<td>CV003</td>
+						<td>Context</td>
+						<td>Resource-Appropriate Recommendations</td>
+						<td>Are recommendations appropriate for available resources?</td>
+						<td>Medium</td>
+						<td class="status-pending">Pending</td>
+						<td>14</td>
+						<td>Resource constraint scenarios</td>
+						<td>Context-aware implementation</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="section">
+			<h2>2. Experiment Execution Template</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Description</th>
+						<th>Example</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Experiment ID</strong></td>
+						<td>Unique identifier from master registry</td>
+						<td>TP001</td>
+					</tr>
+					<tr>
+						<td><strong>Date Conducted</strong></td>
+						<td>When experiment was run</td>
+						<td>2024-03-15</td>
+					</tr>
+					<tr>
+						<td><strong>Hypothesis</strong></td>
+						<td>Specific prediction being tested</td>
+						<td>Response time will be &lt;2s for 95% of queries</td>
+					</tr>
+					<tr>
+						<td><strong>Method</strong></td>
+						<td>How experiment was conducted</td>
+						<td>100 queries on 3 device types, offline mode</td>
+					</tr>
+					<tr>
+						<td><strong>Sample Size</strong></td>
+						<td>Number of observations</td>
+						<td>300 queries (100 per device)</td>
+					</tr>
+					<tr>
+						<td><strong>Variables</strong></td>
+						<td>What was measured/controlled</td>
+						<td>Device type, query complexity, response time</td>
+					</tr>
+					<tr>
+						<td><strong>Results</strong></td>
+						<td>Numerical outcomes</td>
+						<td>Mean: 1.3s, 95th percentile: 1.8s, 98% &lt;2s</td>
+					</tr>
+					<tr>
+						<td><strong>Statistical Analysis</strong></td>
+						<td>Statistical tests performed</td>
+						<td>ANOVA, confidence intervals</td>
+					</tr>
+					<tr>
+						<td><strong>Conclusion</strong></td>
+						<td>Hypothesis supported/rejected</td>
+						<td>Hypothesis SUPPORTED - exceeds target</td>
+					</tr>
+					<tr>
+						<td><strong>Next Steps</strong></td>
+						<td>Follow-up actions needed</td>
+						<td>Test with larger datasets, older devices</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="section">
+			<h2>3. Metrics Tracking Dashboard</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Metric Category</th>
+						<th>Specific Metric</th>
+						<th>Target Value</th>
+						<th>Current Value</th>
+						<th>Status</th>
+						<th>Last Updated</th>
+						<th>Trend</th>
+						<th>Notes</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="category">
+						<td colspan="8">SYSTEM PERFORMANCE METRICS</td>
+					</tr>
+					<tr>
+						<td>Performance</td>
+						<td>Response Time (offline)</td>
+						<td class="metric-target">&lt;2 seconds</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Baseline measurement needed</td>
+					</tr>
+					<tr>
+						<td>Performance</td>
+						<td>App Size</td>
+						<td class="metric-target">&lt;100MB</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Measure after all features</td>
+					</tr>
+					<tr>
+						<td>Performance</td>
+						<td>Battery Usage</td>
+						<td class="metric-target">&lt;10% daily</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Test on target devices</td>
+					</tr>
+					<tr class="category">
+						<td colspan="8">AI PERFORMANCE METRICS</td>
+					</tr>
+					<tr>
+						<td>AI Accuracy</td>
+						<td>Diagnostic Accuracy</td>
+						<td class="metric-target">&gt;80%</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Need expert validation</td>
+					</tr>
+					<tr>
+						<td>AI Quality</td>
+						<td>Recommendation Appropriateness</td>
+						<td class="metric-target">&gt;90%</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Clinical expert review needed</td>
+					</tr>
+					<tr class="category">
+						<td colspan="8">USER EXPERIENCE METRICS</td>
+					</tr>
+					<tr>
+						<td>Usability</td>
+						<td>SUS Score</td>
+						<td class="metric-target">&gt;70</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Healthcare provider testing</td>
+					</tr>
+					<tr>
+						<td>Efficiency</td>
+						<td>Task Completion Rate</td>
+						<td class="metric-target">&gt;90%</td>
+						<td>Not tested</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+						<td>-</td>
+						<td>Measure successful workflows</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="section">
+			<h2>4. Research Questions Validation Matrix</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Research Question</th>
+						<th>Related Experiments</th>
+						<th>Required Evidence</th>
+						<th>Success Criteria</th>
+						<th>Status</th>
+						<th>Validation Date</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>RQ1:</strong> Can offline-first CDSS maintain clinical quality comparable to online
+							systems?</td>
+						<td>AI001, AI004, CV001, CV002</td>
+						<td>Accuracy comparison, expert validation</td>
+						<td>&gt;80% accuracy maintained offline</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+					</tr>
+					<tr>
+						<td><strong>RQ2:</strong> What level of AI accuracy is required for clinical acceptance?</td>
+						<td>AI001, UX001, CV002</td>
+						<td>User acceptance studies, safety analysis</td>
+						<td>Correlation between accuracy & acceptance</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+					</tr>
+					<tr>
+						<td><strong>RQ3:</strong> How does workflow integration affect adoption?</td>
+						<td>UX001, UX002, UX003</td>
+						<td>Workflow analysis, efficiency measurement</td>
+						<td>Positive correlation efficiency-adoption</td>
+						<td class="status-pending">Pending</td>
+						<td>-</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="section">
+			<h2>5. Publication Planning Matrix</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Paper Focus</th>
+						<th>Target Venue</th>
+						<th>Required Experiments</th>
+						<th>Deadline</th>
+						<th>Lead Author</th>
+						<th>Status</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>Technical Architecture</td>
+						<td>IEEE Computer</td>
+						<td>TP001-004, AI004</td>
+						<td>2024-08-01</td>
+						<td>You</td>
+						<td class="status-pending">Pending</td>
+					</tr>
+					<tr>
+						<td>Clinical Validation</td>
+						<td>JMIR Medical Informatics</td>
+						<td>AI001-003, CV001-003</td>
+						<td>2024-09-01</td>
+						<td>You</td>
+						<td class="status-pending">Pending</td>
+					</tr>
+					<tr>
+						<td>Usability Study</td>
+						<td>International Journal of Medical Informatics</td>
+						<td>UX001-003</td>
+						<td>2024-10-01</td>
+						<td>You</td>
+						<td class="status-pending">Pending</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="section">
+			<h2>6. Weekly Progress Tracker</h2>
+			<p><strong>Instructions:</strong> Copy this template for each week of your research</p>
+			<table>
+				<thead>
+					<tr>
+						<th>Week #</th>
+						<th>Planned Activities</th>
+						<th>Experiments Conducted</th>
+						<th>Results Summary</th>
+						<th>Issues Encountered</th>
+						<th>Next Week Planning</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>Week 5</td>
+						<td>TP001 - Offline Response Testing</td>
+						<td></td>
+						<td></td>
+						<td></td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Week 6</td>
+						<td>TP002 - Battery Testing, TP003 - Storage Testing</td>
+						<td></td>
+						<td></td>
+						<td></td>
+						<td></td>
+					</tr>
+					<!-- Add rows for each week -->
+				</tbody>
+			</table>
+		</div>
+
+	</div>
+</body>
+
+</html>
