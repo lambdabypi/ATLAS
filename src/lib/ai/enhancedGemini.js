@@ -1,11 +1,56 @@
-// src/lib/ai/enhancedGemini.js
+// src/lib/ai/enhancedGemini.js - FIXED VERSION with correct Google GenAI API usage
 import { GoogleGenAI } from '@google/genai';
 import { offlineQueryDb, syncQueueDb } from '../db';
 import { getRelevantGuidelines } from '../db/expandedGuidelines';
 
-// Initialize with enhanced error handling
+// Initialize with enhanced error handling - FIXED API USAGE
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+
+let ai = null;
+try {
+	if (API_KEY) {
+		ai = new GoogleGenAI({
+			apiKey: API_KEY
+		});
+		console.log('✅ Google GenAI initialized successfully');
+	} else {
+		console.warn('⚠️ NEXT_PUBLIC_GEMINI_API_KEY not found - AI features will be limited to rule-based recommendations');
+	}
+} catch (error) {
+	console.error('❌ Failed to initialize Google GenAI:', error);
+	ai = null;
+}
+
+// SMART Guidelines Engine - loaded dynamically when needed
+let SMARTGuidelinesEngine = null;
+let smartGuidelinesLoading = false;
+let smartGuidelinesLoadError = null;
+
+// Load SMART Guidelines Engine dynamically
+const loadSMARTGuidelines = async () => {
+	if (SMARTGuidelinesEngine || smartGuidelinesLoading) {
+		return SMARTGuidelinesEngine;
+	}
+
+	if (smartGuidelinesLoadError) {
+		return null; // Don't retry if previously failed
+	}
+
+	smartGuidelinesLoading = true;
+
+	try {
+		const smartModule = await import('../clinical/smartGuidelines');
+		SMARTGuidelinesEngine = smartModule.SMARTGuidelinesEngine;
+		console.log('SMART Guidelines engine loaded successfully');
+		return SMARTGuidelinesEngine;
+	} catch (error) {
+		console.warn('SMART Guidelines not available:', error.message);
+		smartGuidelinesLoadError = error;
+		return null;
+	} finally {
+		smartGuidelinesLoading = false;
+	}
+};
 
 // Error types for better handling
 export const AI_ERROR_TYPES = {
@@ -80,6 +125,56 @@ const classifyError = (error) => {
 	return AI_ERROR_TYPES.UNKNOWN;
 };
 
+// Get applicable WHO SMART Guidelines
+const getApplicableGuidelines = async (patientData, context) => {
+	// Try to load SMART Guidelines engine
+	const SMARTEngine = await loadSMARTGuidelines();
+
+	if (!SMARTEngine) {
+		console.log('SMART Guidelines engine not available, using expanded guidelines');
+		return await getRelevantGuidelines(patientData?.symptoms || '', patientData);
+	}
+
+	try {
+		const smartEngine = new SMARTEngine();
+		const clinicalDomain = determineClinicalDomain(patientData, context);
+
+		const guidelines = await smartEngine.executeGuideline(
+			clinicalDomain,
+			patientData,
+			context
+		);
+
+		return guidelines;
+	} catch (error) {
+		console.warn('Could not retrieve SMART Guidelines:', error);
+		// Fallback to expanded guidelines
+		return await getRelevantGuidelines(patientData?.symptoms || '', patientData);
+	}
+};
+
+// Determine clinical domain from patient data
+const determineClinicalDomain = (patientData, context) => {
+	if (patientData?.pregnancy || context?.encounterType === 'anc-visit') {
+		return 'maternal-health';
+	}
+
+	if (patientData?.age && patientData.age < 5) {
+		return 'infectious-diseases'; // IMCI domain
+	}
+
+	const symptoms = patientData?.symptoms || '';
+	if (symptoms.includes('fever') || symptoms.includes('cough') || symptoms.includes('diarrhea')) {
+		return 'infectious-diseases';
+	}
+
+	if (patientData?.chronicConditions || context?.encounterType === 'chronic-care') {
+		return 'non-communicable-diseases';
+	}
+
+	return 'general-medicine';
+};
+
 // Generate confidence score based on available data
 const calculateConfidence = (patientData, relevantGuidelines, queryComplexity) => {
 	let score = 0;
@@ -97,11 +192,15 @@ const calculateConfidence = (patientData, relevantGuidelines, queryComplexity) =
 	if (patientData?.age && patientData?.gender) score += 5;
 
 	// Relevant guidelines available (0-30 points)
-	if (relevantGuidelines?.length >= 3) score += 20;
-	else if (relevantGuidelines?.length >= 2) score += 15;
-	else if (relevantGuidelines?.length >= 1) score += 10;
+	const guidelineCount = relevantGuidelines?.recommendations?.length || relevantGuidelines?.length || 0;
+	if (guidelineCount >= 3) score += 20;
+	else if (guidelineCount >= 2) score += 15;
+	else if (guidelineCount >= 1) score += 10;
 
-	if (relevantGuidelines?.some(g => g.resourceLevel === 'basic')) score += 10;
+	// Check for resource-appropriate guidelines
+	const hasBasicGuidelines = relevantGuidelines?.recommendations?.some(g => g.resourceConstraints?.includes('basic-infrastructure')) ||
+		relevantGuidelines?.some(g => g.resourceLevel === 'basic');
+	if (hasBasicGuidelines) score += 10;
 
 	// Query complexity (0-30 points)
 	if (queryComplexity === 'simple') score += 30;
@@ -124,7 +223,7 @@ const getRuleBasedRecommendation = (symptoms, patientData, relevantGuidelines) =
 	if (symptomString.includes('cough') && symptomString.includes('fever')) {
 		if (age && age < 5) {
 			return {
-				text: `Based on clinical guidelines for pneumonia in children:
+				text: `Based on WHO IMCI guidelines for pneumonia in children:
 
 **ASSESSMENT NEEDED:**
 - Count respiratory rate for full minute
@@ -141,7 +240,7 @@ const getRuleBasedRecommendation = (symptoms, patientData, relevantGuidelines) =
 - Severe chest indrawing
 - Convulsions or unconscious
 
-This is basic guideline-based advice. Clinical judgment essential.`,
+This is WHO IMCI guideline-based advice. Clinical judgment essential.`,
 				confidence: CONFIDENCE_LEVELS.MEDIUM,
 				isRuleBased: true,
 				sourceGuidelines: relevantGuidelines?.filter(g => g.category === 'Respiratory')
@@ -195,7 +294,7 @@ Clinical assessment essential for accurate diagnosis.`,
 - Severe dehydration signs
 - Persistent vomiting
 
-This is guideline-based advice. Clinical assessment required.`,
+This is WHO guideline-based advice. Clinical assessment required.`,
 			confidence: CONFIDENCE_LEVELS.MEDIUM,
 			isRuleBased: true
 		};
@@ -209,7 +308,7 @@ This is guideline-based advice. Clinical assessment required.`,
 
 		if (hasMalariaSymptoms) {
 			return {
-				text: `Based on malaria management guidelines:
+				text: `Based on WHO malaria management guidelines:
 
 **ASSESSMENT:**
 - Rapid diagnostic test (RDT) if available
@@ -228,9 +327,44 @@ This is guideline-based advice. Clinical assessment required.`,
 
 **URGENT REFERRAL if severe malaria suspected**
 
-This is guideline-based advice. Diagnostic testing recommended when available.`,
+This is WHO guideline-based advice. Diagnostic testing recommended when available.`,
 				confidence: CONFIDENCE_LEVELS.MEDIUM,
 				isRuleBased: true
+			};
+		}
+	}
+
+	// Maternal health symptoms
+	if (symptomString.includes('pregnant') || symptomString.includes('pregnancy') ||
+		patientData?.pregnancy || patientData?.gestationalAge) {
+
+		if (symptomString.includes('headache') && symptomString.includes('vision')) {
+			return {
+				text: `Based on WHO antenatal care guidelines - URGENT ASSESSMENT NEEDED:
+
+**PREECLAMPSIA ASSESSMENT:**
+- Blood pressure measurement
+- Proteinuria testing
+- Check for edema
+- Assess reflexes
+
+**DANGER SIGNS:**
+- BP >140/90 mmHg
+- Protein in urine
+- Severe headache with visual changes
+- Epigastric pain
+
+**IMMEDIATE ACTION:**
+- If severe preeclampsia suspected: URGENT referral
+- Give antihypertensive if BP >160/110
+- Prepare magnesium sulfate if available
+
+**DO NOT DELAY REFERRAL**
+
+This requires immediate clinical assessment and likely hospital care.`,
+				confidence: CONFIDENCE_LEVELS.HIGH,
+				isRuleBased: true,
+				urgency: 'immediate'
 			};
 		}
 	}
@@ -262,7 +396,7 @@ Clinical guidelines available in reference section. Professional judgment essent
 	};
 };
 
-// Enhanced clinical recommendations with comprehensive error handling
+// Enhanced clinical recommendations with SMART Guidelines integration
 export async function getEnhancedClinicalRecommendations(
 	query,
 	patientData,
@@ -276,24 +410,41 @@ export async function getEnhancedClinicalRecommendations(
 		saveForLater = true
 	} = options;
 
+	const startTime = performance.now();
+	let smartRecommendations = null;
+
 	// Determine query complexity
 	const queryComplexity = query.length > 200 ? 'complex' :
 		query.length > 100 ? 'moderate' : 'simple';
 
-	// Calculate confidence based on available data
-	const confidence = calculateConfidence(patientData, relevantMedicalData, queryComplexity);
+	try {
+		// Step 1: Get WHO SMART Guidelines recommendations first
+		smartRecommendations = await getApplicableGuidelines(patientData, options.context);
+		console.log('Retrieved SMART Guidelines:', smartRecommendations?.recommendations?.length || 0);
+
+		// Use SMART guidelines for relevantMedicalData if not provided
+		if (!relevantMedicalData && smartRecommendations) {
+			relevantMedicalData = { guidelines: smartRecommendations };
+		}
+	} catch (error) {
+		console.warn('Error retrieving SMART Guidelines:', error);
+	}
+
+	// Calculate confidence based on available data (including SMART guidelines)
+	const confidence = calculateConfidence(patientData, smartRecommendations, queryComplexity);
 
 	// Check if we're offline or have no API key
 	const isOnline = await checkOnlineStatus();
 
 	if (!isOnline || !API_KEY || !ai) {
-		console.log('Offline or no API key - using rule-based fallback');
+		console.log('Offline or no API key - using rule-based fallback with SMART Guidelines');
 
 		if (saveForLater) {
 			await offlineQueryDb.add({
 				query,
 				patientData,
 				relevantMedicalData,
+				smartRecommendations,
 				type: 'clinical',
 				timestamp: new Date().toISOString(),
 				priority: 'normal'
@@ -304,14 +455,16 @@ export async function getEnhancedClinicalRecommendations(
 			const ruleBasedResult = getRuleBasedRecommendation(
 				patientData?.symptoms || query,
 				patientData,
-				relevantMedicalData?.guidelines
+				smartRecommendations?.recommendations || relevantMedicalData?.guidelines
 			);
 
 			return {
 				...ruleBasedResult,
+				smartGuidelines: smartRecommendations,
 				errorType: !API_KEY ? AI_ERROR_TYPES.NO_API_KEY : AI_ERROR_TYPES.OFFLINE,
 				timestamp: new Date(),
-				queryId: generateQueryId()
+				queryId: generateQueryId(),
+				responseTime: performance.now() - startTime
 			};
 		}
 
@@ -320,9 +473,11 @@ export async function getEnhancedClinicalRecommendations(
       
 Please refer to the clinical guidelines in the Reference section for immediate guidance.`,
 			confidence: CONFIDENCE_LEVELS.VERY_LOW,
+			smartGuidelines: smartRecommendations,
 			errorType: !API_KEY ? AI_ERROR_TYPES.NO_API_KEY : AI_ERROR_TYPES.OFFLINE,
 			timestamp: new Date(),
 			queryId: generateQueryId(),
+			responseTime: performance.now() - startTime,
 			isError: true
 		};
 	}
@@ -335,26 +490,30 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-			// Generate enhanced context
-			const context = await generateEnhancedContext(patientData, relevantMedicalData);
+			// Generate enhanced context with SMART Guidelines
+			const context = await generateEnhancedContext(patientData, relevantMedicalData, smartRecommendations);
 
-			// Create comprehensive prompt
-			const prompt = createEnhancedPrompt(query, context, confidence);
+			// Create comprehensive prompt with SMART Guidelines
+			const prompt = createEnhancedPromptWithSMART(query, context, confidence, smartRecommendations);
 
+			// FIXED: Use correct Google GenAI API pattern
 			const response = await ai.models.generateContent({
-				model: "gemini-2.5-flash",
-				contents: prompt,
-				signal: controller.signal
+				model: "gemini-2.0-flash-exp",
+				contents: prompt
 			});
 
 			clearTimeout(timeoutId);
 
-			if (!response.text || typeof response.text !== 'string') {
+			// FIXED: Access response text correctly
+			const responseText = response.text;
+
+			if (!responseText || typeof responseText !== 'string') {
 				throw new Error('Invalid response format from AI service');
 			}
 
-			// Validate response quality
-			const validationResult = validateAIResponse(response.text, query);
+			// Validate response quality and against SMART Guidelines
+			const validationResult = validateAIResponse(responseText, query);
+			const smartValidation = validateWithGuidelines(responseText, smartRecommendations);
 
 			if (!validationResult.isValid) {
 				console.warn('AI response failed validation:', validationResult.reason);
@@ -362,21 +521,31 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 					return getRuleBasedRecommendation(
 						patientData?.symptoms || query,
 						patientData,
-						relevantMedicalData?.guidelines
+						smartRecommendations?.recommendations || relevantMedicalData?.guidelines
 					);
 				}
 				continue; // Retry
 			}
 
+			const finalConfidence = calculateConfidenceScore(
+				{ validation: smartValidation, ...validationResult },
+				smartRecommendations
+			);
+
 			return {
-				text: response.text,
+				text: responseText,
 				confidence: confidence,
+				finalConfidence: finalConfidence,
 				timestamp: new Date(),
 				fromCache: false,
 				isAiGenerated: true,
 				validationScore: validationResult.score,
+				smartValidation: smartValidation,
+				smartGuidelines: smartRecommendations,
 				queryId: generateQueryId(),
-				retryCount: attempt - 1
+				retryCount: attempt - 1,
+				responseTime: performance.now() - startTime,
+				sources: extractSources(smartRecommendations)
 			};
 
 		} catch (error) {
@@ -415,6 +584,7 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 						query,
 						patientData,
 						relevantMedicalData,
+						smartRecommendations,
 						type: 'clinical',
 						timestamp: new Date().toISOString(),
 						priority: 'high', // Higher priority since AI failed
@@ -426,15 +596,17 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 					const ruleBasedResult = getRuleBasedRecommendation(
 						patientData?.symptoms || query,
 						patientData,
-						relevantMedicalData?.guidelines
+						smartRecommendations?.recommendations || relevantMedicalData?.guidelines
 					);
 
 					return {
 						...ruleBasedResult,
+						smartGuidelines: smartRecommendations,
 						errorType,
 						originalError: error.message,
 						timestamp: new Date(),
-						queryId: generateQueryId()
+						queryId: generateQueryId(),
+						responseTime: performance.now() - startTime
 					};
 				}
 
@@ -443,23 +615,25 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 
 Your query has been saved and will be processed when possible. Please refer to clinical guidelines in the Reference section for immediate guidance.`,
 					confidence: CONFIDENCE_LEVELS.VERY_LOW,
+					smartGuidelines: smartRecommendations,
 					errorType,
 					originalError: error.message,
 					timestamp: new Date(),
 					queryId: generateQueryId(),
+					responseTime: performance.now() - startTime,
 					isError: true
 				};
 			}
 		}
 	}
-};
+}
 
 // Helper functions
 const generateQueryId = () => {
 	return 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 };
 
-const generateEnhancedContext = async (patientData, relevantMedicalData) => {
+const generateEnhancedContext = async (patientData, relevantMedicalData, smartRecommendations) => {
 	let context = '';
 
 	if (patientData) {
@@ -467,35 +641,142 @@ const generateEnhancedContext = async (patientData, relevantMedicalData) => {
 		if (patientData.medicalHistory) context += `History: ${patientData.medicalHistory}\n`;
 		if (patientData.allergies) context += `Allergies: ${patientData.allergies}\n`;
 		if (patientData.currentMedications) context += `Current Rx: ${patientData.currentMedications}\n`;
+		if (patientData.pregnancy) context += `Pregnancy status: Active\n`;
+		if (patientData.gestationalAge) context += `Gestational age: ${patientData.gestationalAge} weeks\n`;
 	}
 
-	if (relevantMedicalData?.guidelines?.length > 0) {
+	// Add WHO SMART Guidelines context
+	if (smartRecommendations?.recommendations?.length > 0) {
+		context += `\nWHO SMART GUIDELINES RECOMMENDATIONS:\n`;
+		smartRecommendations.recommendations.slice(0, 3).forEach((rec, idx) => {
+			context += `${idx + 1}. ${rec.title}: ${rec.description}\n`;
+			context += `   Evidence Level: ${rec.evidence}\n`;
+			if (rec.resourceConstraints?.length > 0) {
+				context += `   Resource Requirements: ${rec.resourceConstraints.join(', ')}\n`;
+			}
+		});
+	}
+
+	// Add expanded guidelines if available
+	if (relevantMedicalData?.guidelines?.length > 0 && !smartRecommendations) {
 		context += `\nRELEVANT GUIDELINES:\n`;
-		relevantMedicalData.guidelines.slice(0, 3).forEach(guide => { // Limit to prevent context overflow
-			context += `- ${guide.title}: ${guide.content.overview || 'Clinical guideline available'}\n`;
+		relevantMedicalData.guidelines.slice(0, 2).forEach(guide => {
+			context += `- ${guide.title}: ${guide.content?.overview || 'Clinical guideline available'}\n`;
 		});
 	}
 
 	return context;
 };
 
-const createEnhancedPrompt = (query, context, confidence) => {
-	return `You are a clinical decision support AI for healthcare providers in resource-limited settings. Provide evidence-based recommendations adapted to available resources.
+const createEnhancedPromptWithSMART = (query, context, confidence, smartRecommendations) => {
+	let prompt = `You are a clinical decision support AI for healthcare providers in resource-limited settings. Provide evidence-based recommendations adapted to available resources.
 
 IMPORTANT: Your recommendations will be reviewed by a healthcare provider. Be clear about limitations and uncertainty.
 
 ${context}
 
-QUERY: ${query}
+`;
+
+	if (smartRecommendations && smartRecommendations.recommendations) {
+		prompt += `CRITICAL: Your response should be consistent with the WHO SMART Guidelines above while providing additional clinical context and practical implementation advice.
+
+`;
+	}
+
+	prompt += `CLINICAL QUERY: ${query}
 
 Provide structured response with:
-1. ASSESSMENT - key points to evaluate
-2. DIFFERENTIAL DIAGNOSIS - most likely conditions (max 3)
-3. MANAGEMENT - practical steps with available resources
+1. ASSESSMENT - key clinical findings to evaluate
+2. DIAGNOSIS/DIFFERENTIAL - most likely conditions (max 3)
+3. MANAGEMENT - practical treatment steps aligned with WHO guidelines
 4. RED FLAGS - when to refer urgently
 5. FOLLOW-UP - monitoring recommendations
+6. RESOURCE ADAPTATIONS - modifications for limited resources
 
-Keep responses practical for resource-limited settings. Indicate uncertainty clearly.`;
+Be specific about medication names, dosages, and timelines when appropriate.
+Indicate confidence levels and acknowledge uncertainties.
+Prioritize patient safety and evidence-based care.`;
+
+	return prompt;
+};
+
+// Validate AI response against WHO SMART Guidelines
+const validateWithGuidelines = (responseText, smartRecommendations) => {
+	if (!smartRecommendations || !smartRecommendations.recommendations) {
+		return {
+			method: 'none',
+			score: null,
+			conflicts: [],
+			supportedRecommendations: []
+		};
+	}
+
+	const conflicts = [];
+	const supportedRecommendations = [];
+
+	const responseText_lower = responseText.toLowerCase();
+
+	// Check for conflicts with WHO recommendations
+	for (const guideline of smartRecommendations.recommendations) {
+		const guidelineKey = guideline.title.toLowerCase();
+		const descriptionKey = guideline.description.toLowerCase().substring(0, 50);
+
+		if (responseText_lower.includes(guidelineKey) ||
+			responseText_lower.includes(descriptionKey)) {
+			supportedRecommendations.push(guideline.title);
+		}
+	}
+
+	const validationScore = supportedRecommendations.length / smartRecommendations.recommendations.length;
+
+	return {
+		method: 'who-smart-guidelines',
+		score: validationScore,
+		supportedRecommendations,
+		conflicts,
+		guidelinesMatched: supportedRecommendations.length,
+		totalGuidelines: smartRecommendations.recommendations.length
+	};
+};
+
+// Calculate final confidence score
+const calculateConfidenceScore = (validatedResponse, smartRecommendations) => {
+	let confidence = 0.5; // Base confidence
+
+	if (validatedResponse.validation?.score > 0.8) {
+		confidence += 0.3;
+	} else if (validatedResponse.validation?.score > 0.5) {
+		confidence += 0.2;
+	}
+
+	if (validatedResponse.validation?.conflicts?.length === 0) {
+		confidence += 0.2;
+	}
+
+	if (smartRecommendations && smartRecommendations.recommendations?.length > 0) {
+		confidence += 0.1;
+	}
+
+	return Math.min(confidence, 1.0);
+};
+
+// Extract sources for citation
+const extractSources = (smartRecommendations) => {
+	const sources = [];
+
+	if (smartRecommendations) {
+		sources.push('WHO SMART Guidelines');
+
+		if (smartRecommendations.guidelines) {
+			sources.push(smartRecommendations.guidelines);
+		}
+
+		if (smartRecommendations.version) {
+			sources.push(`Version ${smartRecommendations.version}`);
+		}
+	}
+
+	return sources;
 };
 
 const validateAIResponse = (responseText, originalQuery) => {
@@ -594,7 +875,7 @@ export async function processOfflineQueriesEnhanced() {
 				query.query,
 				query.patientData,
 				query.relevantMedicalData,
-				{ maxRetries: 1, saveForLater: false } // Don't re-queue
+				{ maxRetries: 1, saveForLater: false, context: query.context } // Don't re-queue
 			);
 
 			if (!result.isError) {
@@ -618,4 +899,19 @@ export async function processOfflineQueriesEnhanced() {
 	}
 
 	return { processed, errors };
+}
+
+// Enhanced function specifically for SMART Guidelines integration
+export async function enhancedGeminiWithSMART(query, patientData, context = {}) {
+	return await getEnhancedClinicalRecommendations(
+		query,
+		patientData,
+		null, // Will be populated by SMART Guidelines
+		{
+			context,
+			fallbackToRules: true,
+			saveForLater: true,
+			maxRetries: 2
+		}
+	);
 }

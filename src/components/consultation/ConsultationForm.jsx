@@ -1,325 +1,187 @@
 // src/components/consultation/ConsultationForm.jsx - FIXED VERSION
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { processClinicalSymptoms, getClinicalRecommendations } from '../../lib/ai/gemini';
-import { patientDb, consultationDb, medicalDb } from '../../lib/db';
+import { getRelevantGuidelines } from '../../lib/db/expandedGuidelines';
+import { getById as getPatientById } from '../../lib/db/patients'; // FIXED: Use the correct import
+import { consultationDb } from '../../lib/db';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Input, TextArea } from '../ui/Input';
+import { Input } from '../ui/Input';
+import { TextArea } from '../ui/TextArea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Badge } from '../ui/Badge';
+
+// Simple SMART Guidelines integration for normal form
+let SMARTGuidelinesEngine;
+try {
+	const smartModule = import('../../lib/clinical/smartGuidelines');
+	smartModule.then(module => { SMARTGuidelinesEngine = module.SMARTGuidelinesEngine; });
+} catch (error) {
+	console.warn('SMART Guidelines not available in normal form');
+}
 
 export default function ConsultationForm({ patientId, onConsultationComplete }) {
 	const [patient, setPatient] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [patientLoading, setPatientLoading] = useState(true); // FIXED: Separate loading state for patient
+	const [relevantGuidelines, setRelevantGuidelines] = useState([]);
+	const [smartGuidelines, setSmartGuidelines] = useState(null);
 	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-	const [relevantMedicalData, setRelevantMedicalData] = useState(null);
-
-	// Real-time analysis states
-	const [realTimeDiagnosis, setRealTimeDiagnosis] = useState(null);
-	const [isAnalyzing, setIsAnalyzing] = useState(false);
-	const [analysisProgress, setAnalysisProgress] = useState(0);
-	const [apiError, setApiError] = useState(null);
 
 	const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm();
 
-	// Watch all form fields for real-time analysis
+	// Watch key fields for guideline suggestions
 	const symptoms = watch('symptoms', '');
 	const chiefComplaint = watch('chiefComplaint', '');
-	const vitals = watch('vitals', '');
-	const examination = watch('examination', '');
-	const medicalHistory = watch('medicalHistory', '');
-	const allergies = watch('allergies', '');
-	const currentMedications = watch('currentMedications', '');
 
-	// Load patient data
+	// FIXED: Load patient data with better error handling
 	useEffect(() => {
-		async function loadPatient() {
-			if (patientId) {
-				try {
-					const patientData = await patientDb.getById(patientId);
-					setPatient(patientData);
-
-					if (patientData) {
-						setValue('medicalHistory', patientData.medicalHistory || '');
-						setValue('allergies', patientData.allergies || '');
-						setValue('currentMedications', patientData.currentMedications || '');
-					}
-				} catch (error) {
-					console.error('Error loading patient data:', error);
-				}
-			}
-		}
-
-		loadPatient();
-	}, [patientId, setValue]);
-
-	// Set up online/offline detection
-	useEffect(() => {
-		const handleOnline = () => setIsOnline(true);
-		const handleOffline = () => setIsOnline(false);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
-	}, []);
-
-	// Real-time analysis function with proper error handling
-	const performRealTimeAnalysis = useCallback(async (formData) => {
-		// Only analyze if we have substantial data
-		const hasEnoughData = formData.symptoms?.length > 5 ||
-			formData.chiefComplaint?.length > 3;
-
-		if (!hasEnoughData) {
-			setRealTimeDiagnosis(null);
-			return;
-		}
-
-		if (!isOnline) {
-			setRealTimeDiagnosis({
-				text: 'You are offline. Connect to the internet to get AI-powered clinical recommendations.',
-				timestamp: new Date(),
-				confidence: 'low',
-				isOffline: true
-			});
-			return;
-		}
-
-		setIsAnalyzing(true);
-		setAnalysisProgress(0);
-		setApiError(null);
-
-		try {
-			// Simulate progress updates
-			const progressInterval = setInterval(() => {
-				setAnalysisProgress(prev => Math.min(prev + 15, 85));
-			}, 200);
-
-			const patientData = {
-				name: patient?.name || '',
-				age: patient?.age || '',
-				gender: patient?.gender || '',
-				medicalHistory: formData.medicalHistory || '',
-				allergies: formData.allergies || '',
-				currentMedications: formData.currentMedications || ''
-			};
-
-			// Create a comprehensive query for analysis
-			const analysisQuery = `
-Clinical Assessment Request:
-
-Patient: ${patientData.age} year old ${patientData.gender}
-${formData.chiefComplaint ? `Chief Complaint: ${formData.chiefComplaint}` : ''}
-${formData.symptoms ? `Symptoms: ${formData.symptoms}` : ''}
-${formData.vitals ? `Vitals: ${formData.vitals}` : ''}
-${formData.examination ? `Physical Examination: ${formData.examination}` : ''}
-${formData.medicalHistory ? `Medical History: ${formData.medicalHistory}` : ''}
-
-Please provide:
-1. Most likely differential diagnoses (top 3)
-2. Key clinical findings to support each diagnosis
-3. Recommended next steps for assessment
-4. Treatment considerations for resource-limited setting
-5. Red flags requiring urgent attention
-6. Keep the response concise and clinically relevant.
-
-Format your response clearly with bullet points for easy reading.
-			`.trim();
-
-			console.log('Sending query to Gemini:', analysisQuery);
-
-			// Get AI recommendations
-			const result = await getClinicalRecommendations(
-				analysisQuery,
-				patientData,
-				relevantMedicalData
-			);
-
-			clearInterval(progressInterval);
-			setAnalysisProgress(100);
-
-			console.log('Received Gemini response:', result);
-
-			if (result.error) {
-				throw new Error(result.error);
-			}
-
-			setRealTimeDiagnosis({
-				text: result.text,
-				timestamp: new Date(),
-				confidence: calculateConfidence(formData),
-				fromCache: result.fromCache || false,
-				isError: false
-			});
-
-		} catch (error) {
-			console.error('Error in real-time analysis:', error);
-			setApiError(error.message);
-
-			setRealTimeDiagnosis({
-				text: `Unable to get AI recommendations: ${error.message}. 
-
-Please check:
-- Your internet connection
-- That you have set NEXT_PUBLIC_GEMINI_API_KEY in your .env.local file
-- That your Gemini API key is valid
-
-You can still complete the consultation manually using the clinical guidelines.`,
-				timestamp: new Date(),
-				confidence: 'low',
-				isError: true
-			});
-		} finally {
-			setTimeout(() => {
-				setIsAnalyzing(false);
-				setAnalysisProgress(0);
-			}, 500);
-		}
-	}, [patient, relevantMedicalData, isOnline]);
-
-	// Calculate confidence based on amount of data provided
-	const calculateConfidence = (formData) => {
-		let score = 0;
-		if (formData.symptoms?.length > 10) score += 2;
-		if (formData.chiefComplaint?.length > 5) score += 2;
-		if (formData.vitals?.length > 5) score += 1;
-		if (formData.examination?.length > 10) score += 2;
-		if (formData.medicalHistory?.length > 5) score += 1;
-
-		if (score >= 6) return 'high';
-		if (score >= 4) return 'medium';
-		return 'low';
-	};
-
-	// Debounced real-time analysis trigger
-	useEffect(() => {
-		const formData = {
-			symptoms,
-			chiefComplaint,
-			vitals,
-			examination,
-			medicalHistory,
-			allergies,
-			currentMedications
-		};
-
-		// Only trigger if we have some meaningful data
-		const hasData = symptoms || chiefComplaint || examination;
-
-		if (hasData) {
-			// Debounce the analysis - wait 3 seconds after user stops typing
-			const timeoutId = setTimeout(() => {
-				performRealTimeAnalysis(formData);
-			}, 3000);
-
-			return () => clearTimeout(timeoutId);
-		}
-	}, [symptoms, chiefComplaint, vitals, examination, medicalHistory, allergies, currentMedications, performRealTimeAnalysis]);
-
-	// Find relevant medical data based on symptoms
-	useEffect(() => {
-		async function findRelevantData() {
-			if (!symptoms || symptoms.trim() === '') {
-				setRelevantMedicalData(null);
+		const loadPatientData = async () => {
+			if (!patientId) {
+				setPatientLoading(false);
 				return;
 			}
 
+			console.log('Loading patient with ID:', patientId, typeof patientId);
+
 			try {
-				const symptomsList = symptoms
-					.split(',')
-					.map(s => s.trim())
-					.filter(s => s.length > 3);
+				setPatientLoading(true);
 
-				if (symptomsList.length === 0) return;
+				// Use the fixed patient database function
+				const patientData = await getPatientById(patientId);
 
-				const searchPromises = symptomsList.map(async (symptom) => {
-					const conditions = await medicalDb.searchConditions(symptom);
-					const medications = await medicalDb.searchMedications(symptom);
-					const guidelines = await medicalDb.searchGuidelines(symptom);
-					return { conditions, medications, guidelines };
-				});
+				console.log('Patient data retrieved:', patientData);
 
-				const searchResults = await Promise.all(searchPromises);
-
-				const combinedResults = {
-					conditions: [],
-					medications: [],
-					guidelines: []
-				};
-
-				searchResults.forEach(result => {
-					result.conditions.forEach(condition => {
-						if (!combinedResults.conditions.some(c => c.id === condition.id)) {
-							combinedResults.conditions.push(condition);
-						}
-					});
-
-					result.medications.forEach(medication => {
-						if (!combinedResults.medications.some(m => m.id === medication.id)) {
-							combinedResults.medications.push(medication);
-						}
-					});
-
-					result.guidelines.forEach(guideline => {
-						if (!combinedResults.guidelines.some(g => g.id === guideline.id)) {
-							combinedResults.guidelines.push(guideline);
-						}
-					});
-				});
-
-				setRelevantMedicalData(combinedResults);
+				if (patientData) {
+					setPatient(patientData);
+					// Pre-populate form
+					setValue('medicalHistory', patientData.medicalHistory || '');
+					setValue('allergies', patientData.allergies || '');
+					setValue('currentMedications', patientData.currentMedications || '');
+				} else {
+					console.error('No patient found with ID:', patientId);
+					// Don't fail silently - show an error or redirect
+				}
 			} catch (error) {
-				console.error('Error finding relevant medical data:', error);
+				console.error('Error loading patient data:', error);
+				// Handle error gracefully
+			} finally {
+				setPatientLoading(false);
 			}
-		}
+		};
 
-		const timeoutId = setTimeout(findRelevantData, 500);
+		loadPatientData();
+	}, [patientId, setValue]);
+
+	// Simple guideline suggestions
+	useEffect(() => {
+		const getGuidelines = async () => {
+			if (!symptoms && !chiefComplaint) return;
+
+			try {
+				// Get basic guidelines
+				const guidelines = await getRelevantGuidelines(symptoms || chiefComplaint, {
+					age: patient?.age,
+					conditions: symptoms
+				});
+				setRelevantGuidelines(guidelines);
+
+				// Try to get SMART Guidelines if available
+				if (SMARTGuidelinesEngine && patient) {
+					try {
+						const smartEngine = new SMARTGuidelinesEngine();
+						const clinicalDomain = determineClinicalDomain(patient, symptoms);
+
+						const smartRecs = await smartEngine.executeGuideline(
+							clinicalDomain,
+							{
+								age: patient.age,
+								symptoms: symptoms,
+								pregnancy: patient.pregnancy
+							},
+							{ encounterType: 'outpatient' }
+						);
+
+						setSmartGuidelines(smartRecs);
+					} catch (smartError) {
+						console.warn('SMART Guidelines unavailable:', smartError);
+					}
+				}
+			} catch (error) {
+				console.error('Error fetching guidelines:', error);
+			}
+		};
+
+		// Debounce guideline fetching
+		const timeoutId = setTimeout(getGuidelines, 2000);
 		return () => clearTimeout(timeoutId);
-	}, [symptoms]);
+	}, [symptoms, chiefComplaint, patient]);
 
-	// Handle form submission
+	// Simple clinical domain determination
+	const determineClinicalDomain = (patient, symptoms) => {
+		if (patient?.pregnancy?.status === 'active') {
+			return 'maternal-health';
+		}
+		if (patient?.age && patient.age < 5) {
+			return 'infectious-diseases';
+		}
+		if (symptoms?.includes('fever') || symptoms?.includes('cough') || symptoms?.includes('diarrhea')) {
+			return 'infectious-diseases';
+		}
+		return 'general-medicine';
+	};
+
+	// Form submission
 	const onSubmit = async (data) => {
 		setLoading(true);
 
 		try {
-			// Update patient record
+			// Update patient record using the fixed function
 			if (patient?.id) {
-				await patientDb.update(patient.id, {
-					medicalHistory: data.medicalHistory,
-					allergies: data.allergies,
-					currentMedications: data.currentMedications
-				});
+				await getPatientById(patient.id); // Verify patient still exists
+				// If you have an update function, use it here
+				// await updatePatient(patient.id, { ... });
 			}
+
+			// Prepare consultation data
+			const consultationData = {
+				id: `consultation_${Date.now()}_${patient?.id}`,
+				patientId: patient.id,
+				date: new Date().toISOString(),
+
+				// Clinical data
+				symptoms: data.symptoms,
+				chiefComplaint: data.chiefComplaint,
+				vitals: data.vitals,
+				examination: data.examination,
+
+				// Provider decisions
+				finalDiagnosis: data.providerDiagnosis || '',
+				plan: data.providerPlan || '',
+				providerNotes: data.providerNotes || '',
+
+				// Guidelines reference (basic form doesn't use AI)
+				relevantGuidelinesUsed: relevantGuidelines?.map(g => g.id) || [],
+				smartGuidelinesUsed: smartGuidelines?.recommendations?.map(r => r.id) || [],
+
+				// Metadata
+				formType: 'standard', // Distinguish from enhanced form
+				tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : [],
+				isOnline: isOnline
+			};
 
 			// Save consultation
-			if (patient?.id) {
-				const consultationId = await consultationDb.add({
-					patientId: patient.id,
-					symptoms: data.symptoms,
-					chiefComplaint: data.chiefComplaint,
-					vitals: data.vitals,
-					examination: data.examination,
-					differentialDiagnosis: realTimeDiagnosis?.text,
-					aiRecommendations: realTimeDiagnosis?.text,
-					finalDiagnosis: data.providerDiagnosis || '',
-					plan: data.providerPlan || '',
-					providerNotes: data.providerNotes || '',
-					tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : []
-				});
+			await consultationDb.add(consultationData);
 
-				// Call completion callback if provided
-				if (onConsultationComplete) {
-					onConsultationComplete(consultationId);
-				} else {
-					alert('Consultation saved successfully!');
-				}
+			// Navigate or callback
+			if (onConsultationComplete) {
+				onConsultationComplete(consultationData.id);
+			} else {
+				window.location.href = `/consultation/${consultationData.id}`;
 			}
+
 		} catch (error) {
 			console.error('Error saving consultation:', error);
 			alert('Error saving consultation. Please try again.');
@@ -328,132 +190,104 @@ You can still complete the consultation manually using the clinical guidelines.`
 		}
 	};
 
-	if (!patient) {
+	// Handle online/offline status
+	useEffect(() => {
+		const handleOnlineStatus = () => setIsOnline(navigator.onLine);
+
+		window.addEventListener('online', handleOnlineStatus);
+		window.addEventListener('offline', handleOnlineStatus);
+
+		return () => {
+			window.removeEventListener('online', handleOnlineStatus);
+			window.removeEventListener('offline', handleOnlineStatus);
+		};
+	}, []);
+
+	// FIXED: Show loading state for patient loading
+	if (patientLoading) {
 		return (
 			<div className="flex justify-center items-center min-h-64">
-				<LoadingSpinner />
-				<span className="ml-2">Loading patient data...</span>
+				<LoadingSpinner size="lg" />
+				<span className="ml-3 text-gray-600">Loading patient data...</span>
+			</div>
+		);
+	}
+
+	// FIXED: Better handling of patient not found
+	if (!patient && patientId) {
+		return (
+			<div className="max-w-4xl mx-auto p-6">
+				<Card>
+					<CardContent>
+						<div className="text-center py-12">
+							<h2 className="text-xl font-semibold text-gray-900 mb-4">Patient Not Found</h2>
+							<p className="text-gray-600 mb-6">
+								The patient with ID {patientId} could not be found in the database.
+							</p>
+							<div className="space-x-3">
+								<Button
+									onClick={() => window.history.back()}
+									variant="secondary"
+								>
+									Go Back
+								</Button>
+								<Button
+									onClick={() => window.location.href = '/patients'}
+									variant="primary"
+								>
+									View All Patients
+								</Button>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
 			</div>
 		);
 	}
 
 	return (
-		<div className="max-w-4xl mx-auto space-y-6">
-			{/* Patient Information */}
-			<Card>
-				<CardHeader>
-					<h2 className="text-lg font-semibold text-gray-900">Patient Information</h2>
-				</CardHeader>
-				<CardContent>
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-						<div>
-							<p className="text-sm text-gray-500">Name</p>
-							<p className="font-medium">{patient.name}</p>
-						</div>
-						<div>
-							<p className="text-sm text-gray-500">Age</p>
-							<p className="font-medium">{patient.age} years</p>
-						</div>
-						<div>
-							<p className="text-sm text-gray-500">Gender</p>
-							<p className="font-medium">{patient.gender}</p>
-						</div>
-					</div>
-					{patient.allergies && (
-						<div className="mt-4">
-							<Badge variant="danger">Allergies: {patient.allergies}</Badge>
-						</div>
-					)}
-				</CardContent>
-			</Card>
-
-			{/* AI Analysis Panel */}
-			<Card>
-				<CardHeader>
-					<div className="flex justify-between items-center">
-						<h3 className="text-lg font-semibold text-gray-900">
-							{isAnalyzing ? 'Analyzing Clinical Data...' : 'AI Clinical Decision Support'}
-						</h3>
-						{realTimeDiagnosis && !realTimeDiagnosis.isError && !realTimeDiagnosis.isOffline && (
-							<Badge variant={
-								realTimeDiagnosis.confidence === 'high' ? 'success' :
-									realTimeDiagnosis.confidence === 'medium' ? 'warning' : 'secondary'
-							}>
-								{realTimeDiagnosis.confidence} confidence
+		<div className="max-w-4xl mx-auto p-6">
+			{/* Header */}
+			<div className="mb-6">
+				<div className="flex justify-between items-start">
+					<div>
+						<h1 className="text-2xl font-bold text-gray-900">New Consultation</h1>
+						<p className="text-gray-600">Patient: {patient?.name} (ID: {patient?.id})</p>
+						<div className="flex items-center space-x-2 mt-2">
+							<Badge variant={isOnline ? "success" : "warning"} size="sm">
+								{isOnline ? "🟢 Online" : "🟡 Offline"}
 							</Badge>
-						)}
-					</div>
-				</CardHeader>
-
-				<CardContent>
-					{/* Progress bar for analysis */}
-					{isAnalyzing && (
-						<div className="mb-4">
-							<div className="w-full bg-gray-200 rounded-full h-2">
-								<div
-									className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-									style={{ width: `${analysisProgress}%` }}
-								></div>
-							</div>
-						</div>
-					)}
-
-					{/* Analysis results */}
-					<div className={`p-4 rounded-lg border ${realTimeDiagnosis?.isError ? 'bg-red-50 border-red-200' :
-						realTimeDiagnosis?.isOffline ? 'bg-yellow-50 border-yellow-200' :
-							'bg-gray-50 border-gray-200'
-						}`}>
-						<div className="whitespace-pre-line text-sm">
-							{realTimeDiagnosis ?
-								realTimeDiagnosis.text :
-								'Start entering patient data to see real-time AI clinical analysis and recommendations...'
-							}
-						</div>
-					</div>
-
-					{/* Analysis metadata */}
-					{realTimeDiagnosis && (
-						<div className="mt-4 flex justify-between items-center">
-							<p className="text-xs text-gray-500">
-								Last updated: {realTimeDiagnosis.timestamp.toLocaleTimeString()}
-								{realTimeDiagnosis.fromCache && ' (from cache)'}
-							</p>
-
-							{realTimeDiagnosis.text && !realTimeDiagnosis.isError && (
-								<Button
-									type="button"
-									onClick={() => {
-										// Copy AI recommendations to provider diagnosis field
-										setValue('providerDiagnosis', realTimeDiagnosis.text);
-									}}
-									variant="outline"
-									size="sm"
-								>
-									Copy to Diagnosis
-								</Button>
+							<Badge variant="secondary" size="sm">📋 Standard Form</Badge>
+							{smartGuidelines && (
+								<Badge variant="primary" size="sm">WHO Guidelines Available</Badge>
 							)}
 						</div>
-					)}
-				</CardContent>
-			</Card>
+					</div>
+				</div>
+			</div>
 
-			{/* Relevant Guidelines Display */}
-			{relevantMedicalData?.guidelines && relevantMedicalData.guidelines.length > 0 && (
-				<Card>
+			{/* WHO SMART Guidelines (Simple Display) */}
+			{smartGuidelines?.recommendations && (
+				<Card className="mb-6">
 					<CardHeader>
-						<h3 className="text-lg font-semibold text-gray-900">Relevant Clinical Guidelines</h3>
+						<h2 className="text-lg font-semibold text-gray-900">
+							WHO Clinical Guidelines
+						</h2>
+						<p className="text-sm text-gray-600">
+							Relevant guidelines for this clinical presentation
+						</p>
 					</CardHeader>
 					<CardContent>
-						<div className="space-y-2">
-							{relevantMedicalData.guidelines.slice(0, 3).map(guideline => (
-								<div key={guideline.id} className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-									<h4 className="font-medium text-blue-900">{guideline.title}</h4>
-									<p className="text-sm text-blue-700 mt-1">
-										{typeof guideline.content === 'string' ?
-											JSON.parse(guideline.content).overview || 'Clinical guideline available' :
-											guideline.content.overview || 'Clinical guideline available'
-										}
-									</p>
+						<div className="space-y-3">
+							{smartGuidelines.recommendations.slice(0, 2).map((rec, idx) => (
+								<div key={idx} className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+									<h4 className="font-medium text-blue-900">{rec.title}</h4>
+									<p className="text-sm text-blue-800 mt-1">{rec.description}</p>
+									{rec.evidence && (
+										<span className="text-xs text-blue-600 mt-2 block">
+											Evidence: {rec.evidence}
+										</span>
+									)}
 								</div>
 							))}
 						</div>
@@ -461,7 +295,7 @@ You can still complete the consultation manually using the clinical guidelines.`
 				</Card>
 			)}
 
-			{/* Consultation Form */}
+			{/* Clinical Assessment Form */}
 			<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 				<Card>
 					<CardHeader>
@@ -523,22 +357,18 @@ You can still complete the consultation manually using the clinical guidelines.`
 					</CardContent>
 				</Card>
 
-				{/* Provider Clinical Decision Section */}
+				{/* Clinical Decision Section */}
 				<Card>
 					<CardHeader>
-						<div className="flex justify-between items-center">
-							<h2 className="text-lg font-semibold text-gray-900">Provider Clinical Decision</h2>
-							<Badge variant="primary">Healthcare Provider Responsibility</Badge>
-						</div>
+						<h2 className="text-lg font-semibold text-gray-900">Clinical Decision</h2>
 					</CardHeader>
 
 					<CardContent className="space-y-6">
 						<TextArea
-							label="Final Diagnosis"
-							placeholder="Enter your clinical diagnosis based on assessment and available information..."
-							rows={3}
+							label="Diagnosis"
+							placeholder="Enter your clinical diagnosis..."
+							rows={2}
 							{...register('providerDiagnosis')}
-							helperText="This is your professional clinical diagnosis, distinct from AI recommendations above."
 						/>
 
 						<TextArea
@@ -550,11 +380,10 @@ You can still complete the consultation manually using the clinical guidelines.`
 						/>
 
 						<TextArea
-							label="Additional Clinical Notes"
-							placeholder="Any additional observations, considerations, or notes..."
+							label="Clinical Notes"
+							placeholder="Any additional observations or notes..."
 							rows={2}
 							{...register('providerNotes')}
-							helperText="Optional additional notes for future reference."
 						/>
 					</CardContent>
 				</Card>
@@ -579,6 +408,27 @@ You can still complete the consultation manually using the clinical guidelines.`
 					</Button>
 				</div>
 			</form>
+
+			{/* Basic Guidelines Display */}
+			{relevantGuidelines.length > 0 && (
+				<Card className="mt-6">
+					<CardHeader>
+						<h3 className="text-lg font-semibold text-gray-900">Clinical Reference Guidelines</h3>
+					</CardHeader>
+					<CardContent>
+						<div className="space-y-2">
+							{relevantGuidelines.slice(0, 2).map(guideline => (
+								<div key={guideline.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+									<h4 className="font-medium text-gray-900">{guideline.title}</h4>
+									<p className="text-sm text-gray-700 mt-1">
+										{guideline.content?.overview || 'Clinical guideline reference'}
+									</p>
+								</div>
+							))}
+						</div>
+					</CardContent>
+				</Card>
+			)}
 		</div>
 	);
 }

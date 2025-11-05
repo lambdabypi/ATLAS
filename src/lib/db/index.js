@@ -1,4 +1,4 @@
-// src/lib/db/index.js - FIXED VERSION
+// src/lib/db/index.js - FIXED VERSION with proper exports
 import Dexie from 'dexie';
 
 // Create Dexie database
@@ -16,7 +16,9 @@ db.version(1).stores({
 	// Additional tables for monitoring
 	performanceMetrics: '++id, operation, duration, timestamp, additionalData',
 	biasReports: '++id, queryId, overallSeverity, detectedBiases, timestamp',
-	aiErrors: '++id, errorType, timestamp, query, attempt'
+	aiErrors: '++id, errorType, timestamp, query, attempt',
+	crdtDocuments: '++id, type, nodeId, vectorClock, operations, state',
+	testResults: '++id, testSuite, timestamp, results, overallScore'
 });
 
 // Database open event handler to handle migration issues
@@ -216,18 +218,57 @@ export const patientDb = {
 		}
 	},
 
+	// FIXED: Updated getById function with proper ID handling
 	async getById(id) {
 		try {
-			return await db.patients.get(id);
+			// Validate that id is a valid key
+			if (id === null || id === undefined || id === '') {
+				console.error('Invalid patient ID provided:', id);
+				return null;
+			}
+
+			// Convert to number if it's a string
+			let patientId = id;
+			if (typeof id === 'string') {
+				patientId = parseInt(id, 10);
+				if (isNaN(patientId)) {
+					console.error('Patient ID is not a valid number:', id);
+					return null;
+				}
+			}
+
+			// Ensure it's a positive integer
+			if (!Number.isInteger(patientId) || patientId <= 0) {
+				console.error('Patient ID must be a positive integer:', patientId);
+				return null;
+			}
+
+			const patient = await db.patients.get(patientId);
+
+			if (!patient) {
+				console.log('Patient not found with ID:', patientId);
+				return null;
+			}
+
+			return patient;
 		} catch (error) {
 			console.error('Error getting patient by ID:', error);
-			throw error;
+			return null; // Return null instead of throwing to avoid breaking the UI
 		}
 	},
 
 	async update(id, updates) {
 		try {
-			return await db.patients.update(id, updates);
+			// Use same ID normalization logic
+			let patientId = id;
+			if (typeof id === 'string') {
+				patientId = parseInt(id, 10);
+				if (isNaN(patientId)) {
+					throw new Error('Invalid patient ID provided for update');
+				}
+			}
+
+			return await db.patients.update(patientId, updates);
 		} catch (error) {
 			console.error('Error updating patient:', error);
 			throw error;
@@ -236,7 +277,16 @@ export const patientDb = {
 
 	async delete(id) {
 		try {
-			return await db.patients.delete(id);
+			// Use same ID normalization logic
+			let patientId = id;
+			if (typeof id === 'string') {
+				patientId = parseInt(id, 10);
+				if (isNaN(patientId)) {
+					throw new Error('Invalid patient ID provided for deletion');
+				}
+			}
+
+			return await db.patients.delete(patientId);
 		} catch (error) {
 			console.error('Error deleting patient:', error);
 			throw error;
@@ -513,4 +563,6 @@ export const biasDb = {
 	}
 };
 
-export default db;
+// CRITICAL FIX: Export both named and default exports
+export { db }; // Named export for import { db }
+export default db; // Default export for import db

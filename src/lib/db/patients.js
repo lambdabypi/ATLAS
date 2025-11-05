@@ -1,10 +1,29 @@
-// src/lib/db/patients.js - FIXED VERSION
+// src/lib/db/patients.js - COMPLETELY FIXED VERSION
 import db from './index';
-import { queuePatientSync } from '../sync/patient-sync';
 
 /**
- * Database operations for patients - FIXED VERSION with proper ID validation
+ * Database operations for patients - FIXED with better ID handling
  */
+
+// Helper function to normalize patient ID
+function normalizePatientId(id) {
+	if (id === null || id === undefined || id === '') {
+		return null;
+	}
+
+	// If it's already a number, return it
+	if (typeof id === 'number') {
+		return Number.isInteger(id) && id > 0 ? id : null;
+	}
+
+	// If it's a string, try to convert
+	if (typeof id === 'string') {
+		const numId = parseInt(id, 10);
+		return (Number.isInteger(numId) && numId > 0) ? numId : null;
+	}
+
+	return null;
+}
 
 // Add a new patient
 export async function add(patient) {
@@ -16,15 +35,6 @@ export async function add(patient) {
 
 		// Add to local database
 		const patientId = await db.patients.add(patientWithDefaults);
-
-		// Queue for sync when online - with error handling
-		try {
-			await queuePatientSync(patientId, 'add', patientWithDefaults);
-		} catch (syncError) {
-			console.warn('Could not queue patient for sync:', syncError);
-			// Don't fail the whole operation if sync queueing fails
-		}
-
 		return patientId;
 	} catch (error) {
 		console.error('Error adding patient:', error);
@@ -42,64 +52,42 @@ export async function getAll() {
 	}
 }
 
-// Get patient by ID - with proper validation
+// Get patient by ID - FIXED with better validation
 export async function getById(id) {
 	try {
-		// Validate that id is a valid key
-		if (id === null || id === undefined || id === '') {
-			console.error('Invalid patient ID provided:', id);
+		const normalizedId = normalizePatientId(id);
+
+		if (normalizedId === null) {
+			console.warn('Invalid patient ID provided:', id);
 			return null;
 		}
 
-		// Convert to number if it's a string
-		let patientId = id;
-		if (typeof id === 'string') {
-			patientId = parseInt(id, 10);
-			if (isNaN(patientId)) {
-				console.error('Patient ID is not a valid number:', id);
-				return null;
-			}
-		}
+		const patient = await db.patients.get(normalizedId);
 
-		// Ensure it's a positive integer
-		if (!Number.isInteger(patientId) || patientId <= 0) {
-			console.error('Patient ID must be a positive integer:', patientId);
+		if (!patient) {
+			console.log('Patient not found with ID:', normalizedId);
 			return null;
 		}
 
-		return await db.patients.get(patientId);
+		return patient;
 	} catch (error) {
 		console.error('Error getting patient by ID:', error);
-		throw error;
+		return null; // Return null instead of throwing to avoid breaking the UI
 	}
 }
 
 // Update patient
 export async function update(id, updates) {
 	try {
-		// Validate ID first
-		if (id === null || id === undefined || id === '') {
+		const normalizedId = normalizePatientId(id);
+
+		if (normalizedId === null) {
 			throw new Error('Invalid patient ID provided for update');
 		}
 
-		let patientId = id;
-		if (typeof id === 'string') {
-			patientId = parseInt(id, 10);
-			if (isNaN(patientId)) {
-				throw new Error('Patient ID must be a valid number');
-			}
-		}
-
-		// Queue for sync when online - with error handling
-		try {
-			await queuePatientSync(patientId, 'update', updates);
-		} catch (syncError) {
-			console.warn('Could not queue patient for sync:', syncError);
-			// Don't fail the whole operation if sync queueing fails
-		}
-
 		// Update local database
-		return await db.patients.update(patientId, updates);
+		const result = await db.patients.update(normalizedId, updates);
+		return result;
 	} catch (error) {
 		console.error('Error updating patient:', error);
 		throw error;
@@ -109,29 +97,14 @@ export async function update(id, updates) {
 // Delete patient
 export async function remove(id) {
 	try {
-		// Validate ID first
-		if (id === null || id === undefined || id === '') {
+		const normalizedId = normalizePatientId(id);
+
+		if (normalizedId === null) {
 			throw new Error('Invalid patient ID provided for deletion');
 		}
 
-		let patientId = id;
-		if (typeof id === 'string') {
-			patientId = parseInt(id, 10);
-			if (isNaN(patientId)) {
-				throw new Error('Patient ID must be a valid number');
-			}
-		}
-
-		// Queue for sync when online - with error handling
-		try {
-			await queuePatientSync(patientId, 'delete', null);
-		} catch (syncError) {
-			console.warn('Could not queue patient for sync:', syncError);
-			// Don't fail the whole operation if sync queueing fails
-		}
-
 		// Delete from local database
-		return await db.patients.delete(patientId);
+		return await db.patients.delete(normalizedId);
 	} catch (error) {
 		console.error('Error deleting patient:', error);
 		throw error;
@@ -150,7 +123,7 @@ export async function searchByName(name) {
 			.toArray();
 	} catch (error) {
 		console.error('Error searching patients by name:', error);
-		throw error;
+		return [];
 	}
 }
 
@@ -168,7 +141,7 @@ export async function getRecentPatients(limit = 5) {
 			.toArray();
 	} catch (error) {
 		console.error('Error getting recent patients:', error);
-		throw error;
+		return [];
 	}
 }
 

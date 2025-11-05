@@ -1,9 +1,9 @@
-// src/components/consultation/EnhancedConsultationForm.jsx
+// src/components/consultation/EnhancedConsultationForm.jsx - FIXED VERSION
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { getEnhancedClinicalRecommendations, CONFIDENCE_LEVELS } from '../../lib/ai/enhancedGemini';
+import { enhancedGeminiWithSMART, CONFIDENCE_LEVELS } from '../../lib/ai/enhancedGemini';
 import { analyzeBias, mitigateBias } from '../../lib/ai/biasDetection';
 import { getRelevantGuidelines, seedExpandedGuidelines } from '../../lib/db/expandedGuidelines';
 import { patientDb, consultationDb, medicalDb } from '../../lib/db';
@@ -15,12 +15,25 @@ import { TextArea } from '../ui/TextArea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Badge } from '../ui/Badge';
 
+// Import SMART Guidelines and CRDT if available
+let SMARTGuidelinesEngine, HealthcareCRDTManager;
+try {
+	const smartModule = import('../../lib/clinical/smartGuidelines');
+	const crdtModule = import('../../lib/sync/crdt-healthcare');
+
+	smartModule.then(module => { SMARTGuidelinesEngine = module.SMARTGuidelinesEngine; });
+	crdtModule.then(module => { HealthcareCRDTManager = module.HealthcareCRDTManager; });
+} catch (error) {
+	console.warn('Advanced modules not available:', error.message);
+}
+
 export default function EnhancedConsultationForm({ patientId, onConsultationComplete }) {
 	const [patient, setPatient] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [patientLoading, setPatientLoading] = useState(true);
 	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-	// AI Analysis States
+	// AI Analysis States - FIXED to handle objects properly
 	const [aiAnalysis, setAiAnalysis] = useState(null);
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
 	const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -29,8 +42,10 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 
 	// Enhanced states for clinical workflow
 	const [relevantGuidelines, setRelevantGuidelines] = useState([]);
+	const [smartGuidelines, setSmartGuidelines] = useState(null);
 	const [clinicalContext, setClinicalContext] = useState({});
 	const [consultationId, setConsultationId] = useState(null);
+	const [crdtManager, setCrdtManager] = useState(null);
 
 	const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm();
 
@@ -43,164 +58,207 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	const allergies = watch('allergies', '');
 	const currentMedications = watch('currentMedications', '');
 
-	// NEW: Provider fields for final clinical decision
+	// Provider fields for final clinical decision
 	const providerDiagnosis = watch('providerDiagnosis', '');
 	const providerPlan = watch('providerPlan', '');
 
-	// Load patient data and initialize expanded guidelines
+	// Initialize CRDT manager for collaboration
 	useEffect(() => {
-		async function initializeConsultation() {
-			try {
-				// Ensure expanded guidelines are available
-				await seedExpandedGuidelines(medicalDb);
+		if (HealthcareCRDTManager) {
+			const manager = new HealthcareCRDTManager(`device_${Date.now()}`);
+			setCrdtManager(manager);
+		}
+	}, []);
 
-				if (patientId) {
-					const patientData = await patientDb.getById(patientId);
+	// Load patient data and seed guidelines
+	useEffect(() => {
+		const loadPatientData = async () => {
+			if (!patientId) {
+				setPatientLoading(false);
+				return;
+			}
+
+			try {
+				// Use getById from patientDb
+				const patientData = await patientDb.getById(patientId);
+				if (patientData) {
 					setPatient(patientData);
 
-					if (patientData) {
-						setValue('medicalHistory', patientData.medicalHistory || '');
-						setValue('allergies', patientData.allergies || '');
-						setValue('currentMedications', patientData.currentMedications || '');
-					}
-				}
-			} catch (error) {
-				console.error('Error initializing consultation:', error);
-			}
-		}
+					// Pre-populate form with patient data
+					setValue('medicalHistory', patientData.medicalHistory || '');
+					setValue('allergies', patientData.allergies || '');
+					setValue('currentMedications', patientData.currentMedications || '');
 
-		initializeConsultation();
+					// Set clinical context based on patient
+					setClinicalContext({
+						patientAge: patientData.age,
+						patientGender: patientData.gender,
+						isPregnant: patientData.pregnancy?.status === 'active',
+						gestationalAge: patientData.pregnancy?.gestationalAge,
+						chronicConditions: patientData.chronicConditions || []
+					});
+				}
+
+				// Ensure guidelines are available
+				await seedExpandedGuidelines(medicalDb);
+
+			} catch (error) {
+				console.error('Error loading patient data:', error);
+			} finally {
+				setPatientLoading(false);
+			}
+		};
+
+		loadPatientData();
 	}, [patientId, setValue]);
 
-	// Enhanced real-time analysis with bias detection
+	// Enhanced real-time analysis with SMART Guidelines - FIXED bias handling
 	const performRealTimeAnalysis = useCallback(async (formData) => {
-		const hasEnoughData = formData.symptoms?.length > 5 || formData.chiefComplaint?.length > 3;
-
-		if (!hasEnoughData) {
-			setAiAnalysis(null);
-			setBiasReport(null);
+		if (!formData.symptoms && !formData.chiefComplaint && !formData.examination) {
 			return;
 		}
 
-		const timingId = startTiming('real_time_ai_analysis');
 		setIsAnalyzing(true);
-		setAnalysisProgress(0);
+		setAnalysisProgress(20);
 		setApiError(null);
 
+		const analysisTimingId = startTiming('real_time_analysis');
+
 		try {
-			// Get relevant guidelines based on symptoms and patient age
-			const guidelines = await getRelevantGuidelines(
-				await medicalDb.searchGuidelines(''),
-				formData.symptoms,
-				patient?.age
-			);
+			// Step 1: Get relevant guidelines (20-40%)
+			setAnalysisProgress(40);
+			const guidelines = await getRelevantGuidelines(formData.symptoms, {
+				age: patient?.age,
+				conditions: formData.symptoms
+			});
 			setRelevantGuidelines(guidelines);
 
-			// Progress simulation
-			const progressInterval = setInterval(() => {
-				setAnalysisProgress(prev => Math.min(prev + 15, 85));
-			}, 200);
-
-			const patientData = {
-				name: patient?.name || '',
-				age: patient?.age || '',
-				gender: patient?.gender || '',
-				medicalHistory: formData.medicalHistory || '',
-				allergies: formData.allergies || '',
-				currentMedications: formData.currentMedications || '',
-				symptoms: formData.symptoms || '',
-				vitals: formData.vitals || '',
-				examination: formData.examination || ''
+			// Step 2: Prepare clinical context for SMART Guidelines (40-60%)
+			setAnalysisProgress(60);
+			const enhancedContext = {
+				...clinicalContext,
+				encounterType: determineEncounterType(formData),
+				facilityLevel: 'health-center', // Could be configurable
+				resourceLevel: 'basic'
 			};
 
-			const relevantMedicalData = {
-				guidelines: guidelines.slice(0, 3), // Limit for context size
-				conditions: await medicalDb.searchConditions(formData.symptoms),
-				medications: await medicalDb.searchMedications(formData.symptoms)
-			};
-
-			// Create comprehensive clinical query
-			const clinicalQuery = `
-Clinical Assessment for ${patientData.age} year old ${patientData.gender}:
-
-Chief Complaint: ${formData.chiefComplaint}
+			// Step 3: Get AI analysis with SMART Guidelines (60-80%)
+			setAnalysisProgress(80);
+			const query = `Patient presents with: ${formData.chiefComplaint || 'Multiple symptoms'}
+			
 Symptoms: ${formData.symptoms}
-${formData.vitals ? `Vitals: ${formData.vitals}` : ''}
-${formData.examination ? `Examination: ${formData.examination}` : ''}
+Examination: ${formData.examination}
+Vitals: ${formData.vitals}
 
-Please provide:
-1. Differential diagnosis (top 3 most likely)
-2. Recommended next steps for assessment
-3. Treatment considerations for resource-limited setting
-4. Red flags requiring urgent attention
-5. Follow-up recommendations
+Please provide clinical assessment and recommendations.`;
 
-Format response with clear sections for easy clinical use.
-      `.trim();
-
-			console.log('Requesting enhanced AI analysis...');
-
-			// Get AI recommendations with enhanced error handling
-			const aiResult = await getEnhancedClinicalRecommendations(
-				clinicalQuery,
-				patientData,
-				relevantMedicalData,
-				{ maxRetries: 2, timeoutMs: 15000, fallbackToRules: true }
+			const response = await enhancedGeminiWithSMART(
+				query,
+				{
+					age: patient?.age,
+					gender: patient?.gender,
+					symptoms: formData.symptoms,
+					examination: formData.examination,
+					vitals: formData.vitals,
+					medicalHistory: formData.medicalHistory,
+					allergies: formData.allergies,
+					currentMedications: formData.currentMedications,
+					pregnancy: patient?.pregnancy,
+					gestationalAge: patient?.pregnancy?.gestationalAge
+				},
+				enhancedContext
 			);
 
-			clearInterval(progressInterval);
-			setAnalysisProgress(100);
+			// Store SMART Guidelines for display
+			if (response.smartGuidelines) {
+				setSmartGuidelines(response.smartGuidelines);
+			}
 
-			// Analyze for bias if AI-generated (not rule-based)
+			// Step 4: Bias analysis if AI response available (80-90%) - FIXED
 			let biasAnalysis = null;
-			let mitigatedResponse = aiResult.text;
+			let finalResponseText = response.text;
 
-			if (!aiResult.isRuleBased && !aiResult.isError) {
-				console.log('Analyzing response for bias...');
-				biasAnalysis = await analyzeBias(aiResult.text, patientData, clinicalQuery);
-				setBiasReport(biasAnalysis);
+			if (response.text && !response.isRuleBased) {
+				setAnalysisProgress(90);
+				try {
+					biasAnalysis = await analyzeBias(response.text, {
+						patientAge: patient?.age,
+						patientGender: patient?.gender,
+						symptoms: formData.symptoms,
+						context: 'clinical_recommendation'
+					});
 
-				// Apply bias mitigation if needed
-				if (biasAnalysis.overallSeverity !== 'none') {
-					const mitigation = await mitigateBias(aiResult.text, biasAnalysis);
-					mitigatedResponse = mitigation.mitigatedResponse;
+					if (biasAnalysis.detectedBiases?.length > 0) {
+						// FIXED: Handle mitigation result properly
+						const mitigationResult = await mitigateBias(response.text, biasAnalysis);
+						finalResponseText = mitigationResult.mitigatedResponse; // Extract just the text
+						response.biasMitigated = true;
+						response.mitigationChanges = mitigationResult.changesApplied;
+					}
 
-					console.log(`Bias detected (${biasAnalysis.overallSeverity}), mitigation applied:`,
-						mitigation.changesApplied);
+					setBiasReport(biasAnalysis);
+				} catch (biasError) {
+					console.warn('Bias analysis failed:', biasError);
 				}
 			}
 
+			// Step 5: Update CRDT if available (90-100%)
+			if (crdtManager) {
+				try {
+					const newConsultationId = consultationId || `consultation_${Date.now()}`;
+
+					// Check if document already exists
+					if (!crdtManager.getDocument(newConsultationId)) {
+						const consultationCRDT = crdtManager.createDocument(
+							'consultation',
+							newConsultationId,
+							{
+								patientId: patient?.id,
+								symptoms: formData.symptoms,
+								chiefComplaint: formData.chiefComplaint,
+								vitals: formData.vitals,
+								examination: formData.examination,
+								aiAnalysis: { ...response, text: finalResponseText }, // Use final text
+								smartGuidelines: response.smartGuidelines,
+								timestamp: new Date().toISOString()
+							}
+						);
+
+						if (!consultationId) {
+							setConsultationId(newConsultationId);
+						}
+					}
+				} catch (crdtError) {
+					console.warn('CRDT update failed:', crdtError);
+				}
+			}
+
+			setAnalysisProgress(100);
+
+			// FIXED: Set the final response with corrected text
 			setAiAnalysis({
-				...aiResult,
-				text: mitigatedResponse,
+				...response,
+				text: finalResponseText, // Use the potentially mitigated text
 				biasReport: biasAnalysis,
-				relevantGuidelines: guidelines,
-				timestamp: new Date(),
-				confidence: aiResult.confidence || CONFIDENCE_LEVELS.MEDIUM
+				mitigationApplied: response.biasMitigated || false
 			});
 
-			// Store clinical context for later use
-			setClinicalContext({
-				patientData,
-				relevantMedicalData,
-				query: clinicalQuery,
-				guidelines
-			});
-
-			endTiming(timingId, {
-				success: !aiResult.isError,
-				confidence: aiResult.confidence,
-				biasDetected: biasAnalysis?.overallSeverity !== 'none',
-				guidelinesFound: guidelines.length
+			endTiming(analysisTimingId, {
+				hasAiResponse: !!finalResponseText,
+				responseLength: finalResponseText?.length || 0,
+				confidence: response.confidence,
+				guidelinesCount: guidelines.length,
+				smartGuidelinesCount: response.smartGuidelines?.recommendations?.length || 0,
+				biasDetected: biasAnalysis?.detectedBiases?.length > 0
 			});
 
 		} catch (error) {
-			console.error('Error in real-time analysis:', error);
+			console.error('Real-time analysis failed:', error);
 			setApiError(error.message);
-			endTiming(timingId, { error: error.message });
 
+			// Fallback to basic guideline display
 			setAiAnalysis({
-				text: `Analysis failed: ${error.message}. Please refer to clinical guidelines manually.`,
+				text: `Analysis temporarily unavailable. Please refer to clinical guidelines manually.`,
 				timestamp: new Date(),
 				confidence: CONFIDENCE_LEVELS.VERY_LOW,
 				isError: true
@@ -211,9 +269,23 @@ Format response with clear sections for easy clinical use.
 				setAnalysisProgress(0);
 			}, 500);
 		}
-	}, [patient, medicalDb]);
+	}, [patient, clinicalContext, consultationId, crdtManager]);
 
-	// Debounced analysis trigger (increased to 4 seconds for more stable experience)
+	// Determine encounter type for SMART Guidelines
+	const determineEncounterType = (formData) => {
+		if (patient?.pregnancy?.status === 'active') {
+			return 'anc-visit';
+		}
+		if (patient?.age && patient.age < 5) {
+			return 'pediatric-sick-child';
+		}
+		if (formData.symptoms?.includes('chronic') || patient?.chronicConditions?.length > 0) {
+			return 'chronic-care';
+		}
+		return 'acute-care';
+	};
+
+	// Debounced analysis trigger
 	useEffect(() => {
 		const formData = {
 			symptoms, chiefComplaint, vitals, examination,
@@ -225,13 +297,13 @@ Format response with clear sections for easy clinical use.
 		if (hasData) {
 			const timeoutId = setTimeout(() => {
 				performRealTimeAnalysis(formData);
-			}, 4000);
+			}, 3000); // 3 second delay for better UX
 
 			return () => clearTimeout(timeoutId);
 		}
 	}, [symptoms, chiefComplaint, vitals, examination, medicalHistory, allergies, currentMedications, performRealTimeAnalysis]);
 
-	// Enhanced form submission with proper AI/Provider distinction
+	// Enhanced form submission with CRDT sync
 	const onSubmit = async (data) => {
 		setLoading(true);
 		const submissionTimingId = startTiming('consultation_submission');
@@ -246,8 +318,12 @@ Format response with clear sections for easy clinical use.
 				});
 			}
 
-			// Prepare consultation data with clear AI vs Provider distinction
+			// Generate consultation ID first
+			const finalConsultationId = consultationId || `consultation_${Date.now()}_${patient?.id}`;
+
+			// Prepare consultation data
 			const consultationData = {
+				id: finalConsultationId,
 				patientId: patient.id,
 				date: new Date().toISOString(),
 
@@ -262,175 +338,260 @@ Format response with clear sections for easy clinical use.
 				aiConfidence: aiAnalysis?.confidence || null,
 				aiTimestamp: aiAnalysis?.timestamp?.toISOString() || null,
 				aiModel: aiAnalysis?.isRuleBased ? 'rule_based' : 'gemini_ai',
+
+				// WHO SMART Guidelines data
+				smartGuidelines: smartGuidelines ? {
+					recommendations: smartGuidelines.recommendations,
+					domain: smartGuidelines.domain,
+					version: smartGuidelines.version,
+					evidence: smartGuidelines.evidence
+				} : null,
+
+				// Bias report
 				biasReport: biasReport ? {
 					severity: biasReport.overallSeverity,
 					categories: biasReport.detectedBiases?.map(b => b.category) || [],
 					mitigated: biasReport.detectedBiases?.length > 0
 				} : null,
 
-				// Provider clinical decisions (the authoritative medical decisions)
-				finalDiagnosis: data.providerDiagnosis || '', // Provider's diagnosis
-				plan: data.providerPlan || '', // Provider's treatment plan
-				providerNotes: data.providerNotes || '', // Additional provider notes
+				// Provider clinical decisions (authoritative)
+				finalDiagnosis: data.providerDiagnosis || '',
+				plan: data.providerPlan || '',
+				providerNotes: data.providerNotes || '',
 
 				// Metadata
 				relevantGuidelinesUsed: relevantGuidelines?.map(g => g.id) || [],
 				clinicalContext: clinicalContext,
-				tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : []
+				formType: 'enhanced', // Distinguish from standard form
+				tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : [],
+
+				// CRDT metadata
+				crdtId: crdtManager ? finalConsultationId : null,
+				lastSyncAttempt: new Date().toISOString()
 			};
 
 			// Save consultation
-			const newConsultationId = await consultationDb.add(consultationData);
-			setConsultationId(newConsultationId);
+			await consultationDb.add(consultationData);
 
-			endTiming(submissionTimingId, { success: true, consultationId: newConsultationId });
+			// Update CRDT with final data
+			if (crdtManager && consultationId) {
+				crdtManager.updateDocument(consultationId, 'finalDiagnosis', data.providerDiagnosis, {
+					providerId: 'current-user', // Would be actual user ID
+					providerRole: 'clinician',
+					timestamp: new Date().toISOString()
+				});
+			}
 
-			// Call completion callback
+			endTiming(submissionTimingId, {
+				consultationId: finalConsultationId,
+				hasAiRecommendations: !!consultationData.aiRecommendations,
+				hasSmartGuidelines: !!consultationData.smartGuidelines,
+				hasDiagnosis: !!data.providerDiagnosis
+			});
+
+			// Navigate to consultation view or call completion callback
 			if (onConsultationComplete) {
-				onConsultationComplete(newConsultationId);
+				onConsultationComplete(finalConsultationId);
 			} else {
-				alert('Consultation saved successfully!');
+				window.location.href = `/consultation/${finalConsultationId}`;
 			}
 
 		} catch (error) {
 			console.error('Error saving consultation:', error);
-			endTiming(submissionTimingId, { error: error.message });
 			alert('Error saving consultation. Please try again.');
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	// Utility function to copy AI recommendations to provider fields
-	const copyAIRecommendationsToDiagnosis = () => {
-		if (aiAnalysis?.text) {
-			setValue('providerDiagnosis', aiAnalysis.text);
-		}
-	};
+	// Handle online/offline status
+	useEffect(() => {
+		const handleOnlineStatus = () => setIsOnline(navigator.onLine);
+
+		window.addEventListener('online', handleOnlineStatus);
+		window.addEventListener('offline', handleOnlineStatus);
+
+		return () => {
+			window.removeEventListener('online', handleOnlineStatus);
+			window.removeEventListener('offline', handleOnlineStatus);
+		};
+	}, []);
+
+	if (patientLoading) {
+		return (
+			<div className="flex justify-center items-center min-h-64">
+				<LoadingSpinner size="lg" />
+				<span className="ml-3 text-gray-600">Loading patient data...</span>
+			</div>
+		);
+	}
 
 	if (!patient) {
 		return (
-			<div className="flex justify-center items-center min-h-64">
-				<LoadingSpinner />
-				<span className="ml-2">Loading patient data...</span>
+			<div className="max-w-4xl mx-auto p-6">
+				<Card>
+					<CardContent>
+						<div className="text-center py-12">
+							<h2 className="text-xl font-semibold text-gray-900 mb-4">Patient Not Found</h2>
+							<p className="text-gray-600 mb-6">
+								Unable to load patient data. Please try again.
+							</p>
+							<Button
+								onClick={() => window.history.back()}
+								variant="primary"
+							>
+								Go Back
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
 			</div>
 		);
 	}
 
 	return (
-		<div className="max-w-4xl mx-auto space-y-6">
-			{/* Patient Information Card - Same as before */}
-			<Card>
-				<CardHeader>
-					<h2 className="text-lg font-semibold text-gray-900">Patient Information</h2>
-				</CardHeader>
-				<CardContent>
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-						<div>
-							<p className="text-sm text-gray-500">Name</p>
-							<p className="font-medium">{patient.name}</p>
-						</div>
-						<div>
-							<p className="text-sm text-gray-500">Age</p>
-							<p className="font-medium">{patient.age} years</p>
-						</div>
-						<div>
-							<p className="text-sm text-gray-500">Gender</p>
-							<p className="font-medium">{patient.gender}</p>
-						</div>
-					</div>
-					{patient.allergies && (
-						<div className="mt-4">
-							<Badge variant="danger">Allergies: {patient.allergies}</Badge>
-						</div>
-					)}
-				</CardContent>
-			</Card>
-
-			{/* Enhanced AI Analysis Panel */}
-			<Card>
-				<CardHeader>
-					<div className="flex justify-between items-center">
-						<h3 className="text-lg font-semibold text-gray-900">
-							{isAnalyzing ? 'Analyzing Clinical Data...' : 'AI Clinical Decision Support'}
-						</h3>
-						<div className="flex space-x-2">
-							{aiAnalysis && !aiAnalysis.isError && (
-								<Badge variant={
-									aiAnalysis.confidence === CONFIDENCE_LEVELS.HIGH ? 'success' :
-										aiAnalysis.confidence === CONFIDENCE_LEVELS.MEDIUM ? 'warning' : 'secondary'
-								}>
-									{aiAnalysis.confidence} confidence
+		<div className="max-w-4xl mx-auto p-6">
+			{/* Enhanced Header with Status */}
+			<div className="mb-6">
+				<div className="flex justify-between items-start">
+					<div>
+						<h1 className="text-2xl font-bold text-gray-900">New Consultation</h1>
+						<p className="text-gray-600">Patient: {patient.name} (ID: {patient.id})</p>
+						<div className="flex items-center space-x-2 mt-2">
+							<Badge variant={isOnline ? "success" : "warning"} size="sm">
+								{isOnline ? "🟢 Online" : "🟡 Offline"}
+							</Badge>
+							<Badge variant="primary" size="sm">🤖 Enhanced Form</Badge>
+							{smartGuidelines && (
+								<Badge variant="success" size="sm">
+									WHO SMART Guidelines Active
 								</Badge>
 							)}
-							{biasReport && biasReport.overallSeverity !== 'none' && (
-								<Badge variant="warning">
-									Bias: {biasReport.overallSeverity}
+							{crdtManager && (
+								<Badge variant="secondary" size="sm">
+									Collaborative Mode
 								</Badge>
 							)}
 						</div>
 					</div>
-				</CardHeader>
+				</div>
+			</div>
 
-				<CardContent>
-					{isAnalyzing && (
-						<div className="mb-4">
-							<div className="w-full bg-gray-200 rounded-full h-2">
-								<div
-									className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-									style={{ width: `${analysisProgress}%` }}
-								></div>
-							</div>
-						</div>
-					)}
-
-					<div className={`p-4 rounded-lg border ${aiAnalysis?.isError ? 'bg-red-50 border-red-200' :
-						!isOnline ? 'bg-yellow-50 border-yellow-200' :
-							'bg-gray-50 border-gray-200'
-						}`}>
-						<div className="whitespace-pre-line text-sm">
-							{aiAnalysis ?
-								aiAnalysis.text :
-								'Start entering patient data to see real-time AI clinical analysis and recommendations...'
-							}
-						</div>
-					</div>
-
-					{aiAnalysis && (
-						<div className="mt-4 flex justify-between items-center">
-							<p className="text-xs text-gray-500">
-								Last updated: {aiAnalysis.timestamp.toLocaleTimeString()}
-								{aiAnalysis.isRuleBased && ' (guideline-based)'}
-								{aiAnalysis.fromCache && ' (from cache)'}
-							</p>
-
-							{aiAnalysis.text && !aiAnalysis.isError && (
-								<Button
-									onClick={copyAIRecommendationsToDiagnosis}
-									variant="outline"
-									size="sm"
-								>
-									Copy to Diagnosis
-								</Button>
+			{/* AI Analysis Panel - FIXED to properly display text */}
+			{(isAnalyzing || aiAnalysis) && (
+				<Card className="mb-6">
+					<CardHeader>
+						<div className="flex justify-between items-center">
+							<h2 className="text-lg font-semibold text-gray-900">
+								Clinical Decision Support
+							</h2>
+							{isAnalyzing && (
+								<div className="flex items-center space-x-2">
+									<LoadingSpinner size="sm" />
+									<span className="text-sm text-gray-600">
+										Analyzing... {analysisProgress}%
+									</span>
+								</div>
 							)}
 						</div>
-					)}
+					</CardHeader>
 
-					{/* Bias Report Display */}
-					{biasReport && biasReport.overallSeverity !== 'none' && (
-						<div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-							<h4 className="text-sm font-medium text-yellow-800 mb-2">
-								Bias Detection Alert ({biasReport.overallSeverity} severity)
-							</h4>
-							<div className="text-xs text-yellow-700">
-								Detected biases: {biasReport.detectedBiases?.map(b => b.category).join(', ')}
-								<br />
-								Response has been automatically reviewed and adjusted where possible.
+					<CardContent>
+						{aiAnalysis && (
+							<div className="space-y-4">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center space-x-2">
+										<Badge variant={
+											aiAnalysis.confidence === CONFIDENCE_LEVELS.HIGH ? 'success' :
+												aiAnalysis.confidence === CONFIDENCE_LEVELS.MEDIUM ? 'warning' : 'secondary'
+										}>
+											{aiAnalysis.confidence} Confidence
+										</Badge>
+										{aiAnalysis.isRuleBased && (
+											<Badge variant="secondary" size="sm">WHO Guidelines</Badge>
+										)}
+										{aiAnalysis.smartGuidelines && (
+											<Badge variant="primary" size="sm">SMART Guidelines</Badge>
+										)}
+										{aiAnalysis.mitigationApplied && (
+											<Badge variant="warning" size="sm">Bias Mitigated</Badge>
+										)}
+									</div>
+									<span className="text-xs text-gray-500">
+										{aiAnalysis.responseTime ?
+											`${Math.round(aiAnalysis.responseTime)}ms` :
+											aiAnalysis.timestamp?.toLocaleTimeString()
+										}
+									</span>
+								</div>
+
+								<div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+									<div className="whitespace-pre-wrap text-sm">
+										{/* FIXED: Properly display the text string */}
+										{typeof aiAnalysis.text === 'string' ?
+											aiAnalysis.text :
+											'Analysis complete - see clinical context above'
+										}
+									</div>
+								</div>
+
+								{biasReport && biasReport.detectedBiases?.length > 0 && (
+									<div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+										<div className="flex items-center space-x-2 mb-2">
+											<Badge variant="warning" size="sm">
+												Bias Detected & Mitigated
+											</Badge>
+										</div>
+										<p className="text-sm text-yellow-800">
+											Detected biases: {biasReport.detectedBiases.map(b => b.category).join(', ')}
+										</p>
+									</div>
+								)}
 							</div>
+						)}
+
+						{apiError && (
+							<div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+								<p className="text-sm text-red-800">
+									AI Analysis Error: {apiError}
+								</p>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			)}
+
+			{/* WHO SMART Guidelines Display */}
+			{smartGuidelines?.recommendations && (
+				<Card className="mb-6">
+					<CardHeader>
+						<h2 className="text-lg font-semibold text-gray-900">
+							WHO SMART Guidelines
+						</h2>
+						<p className="text-sm text-gray-600">
+							{smartGuidelines.guidelines} - Domain: {smartGuidelines.domain}
+						</p>
+					</CardHeader>
+					<CardContent>
+						<div className="space-y-3">
+							{smartGuidelines.recommendations.slice(0, 3).map((rec, idx) => (
+								<div key={idx} className="p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+									<h4 className="font-medium text-green-900">{rec.title}</h4>
+									<p className="text-sm text-green-800 mt-1">{rec.description}</p>
+									<div className="flex items-center space-x-4 mt-2 text-xs">
+										<span className="text-green-600">Evidence: {rec.evidence}</span>
+										{rec.resourceConstraints && (
+											<span className="text-green-600">
+												Resources: {rec.resourceConstraints.join(', ')}
+											</span>
+										)}
+									</div>
+								</div>
+							))}
 						</div>
-					)}
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Clinical Assessment Form */}
 			<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -553,16 +714,18 @@ Format response with clear sections for easy clinical use.
 
 			{/* Relevant Guidelines Display */}
 			{relevantGuidelines.length > 0 && (
-				<Card>
+				<Card className="mt-6">
 					<CardHeader>
-						<h3 className="text-lg font-semibold text-gray-900">Relevant Clinical Guidelines</h3>
+						<h3 className="text-lg font-semibold text-gray-900">Additional Clinical Guidelines</h3>
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-2">
 							{relevantGuidelines.slice(0, 3).map(guideline => (
 								<div key={guideline.id} className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
 									<h4 className="font-medium text-blue-900">{guideline.title}</h4>
-									<p className="text-sm text-blue-700 mt-1">{guideline.content.overview}</p>
+									<p className="text-sm text-blue-700 mt-1">
+										{guideline.content?.overview || 'Clinical guideline reference'}
+									</p>
 								</div>
 							))}
 						</div>
