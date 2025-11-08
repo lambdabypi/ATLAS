@@ -1,9 +1,9 @@
-// src/lib/ai/enhancedGemini.js - FIXED VERSION with correct Google GenAI API usage
+// src/lib/ai/enhancedGemini.js - FIXED VERSION with proper rate limiting
 import { GoogleGenAI } from '@google/genai';
 import { offlineQueryDb, syncQueueDb } from '../db';
 import { getRelevantGuidelines } from '../db/expandedGuidelines';
 
-// Initialize with enhanced error handling - FIXED API USAGE
+// Initialize with enhanced error handling
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
 let ai = null;
@@ -21,6 +21,133 @@ try {
 	ai = null;
 }
 
+// 🎯 PRODUCTION RATE LIMITER - Same as your testing script
+class ProductionRateLimiter {
+	constructor(options = {}) {
+		this.maxRequests = options.maxRequests || 6; // Even more conservative for production
+		this.windowMs = options.windowMs || 60000; // 1 minute window
+		this.maxRetries = options.maxRetries || 3;
+		this.baseDelay = options.baseDelay || 2000;
+		this.maxDelay = options.maxDelay || 30000;
+
+		this.requests = [];
+		this.retryCount = new Map();
+		this.isRateLimited = false;
+		this.rateLimitResetTime = null;
+
+		// Track consecutive failures for circuit breaker
+		this.consecutiveFailures = 0;
+		this.maxConsecutiveFailures = 3;
+		this.circuitBreakerResetTime = null;
+	}
+
+	async waitForSlot(requestId = null) {
+		const now = Date.now();
+		const id = requestId || `req_${now}_${Math.random().toString(36).substr(2, 9)}`;
+
+		// Check circuit breaker
+		if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+			if (this.circuitBreakerResetTime && now < this.circuitBreakerResetTime) {
+				const waitTime = this.circuitBreakerResetTime - now;
+				console.log(`🚫 Circuit breaker active - waiting ${Math.round(waitTime / 1000)}s...`);
+				throw new Error(`Circuit breaker active - too many API failures. Try again in ${Math.round(waitTime / 1000)} seconds.`);
+			} else if (this.circuitBreakerResetTime && now >= this.circuitBreakerResetTime) {
+				console.log('🔄 Circuit breaker reset - attempting recovery');
+				this.consecutiveFailures = 0;
+				this.circuitBreakerResetTime = null;
+			}
+		}
+
+		// Clean old requests outside the window
+		this.requests = this.requests.filter(timestamp =>
+			now - timestamp < this.windowMs
+		);
+
+		// Check if we're currently rate limited
+		if (this.isRateLimited && this.rateLimitResetTime > now) {
+			const waitTime = this.rateLimitResetTime - now;
+			console.log(`⏳ Rate limited - waiting ${Math.round(waitTime / 1000)}s until reset...`);
+			await new Promise(resolve => setTimeout(resolve, waitTime));
+			this.isRateLimited = false;
+			return this.waitForSlot(id);
+		}
+
+		// If we're at the limit, implement exponential backoff
+		if (this.requests.length >= this.maxRequests) {
+			const retries = this.retryCount.get(id) || 0;
+
+			if (retries >= this.maxRetries) {
+				throw new Error(`Rate limit exceeded after ${this.maxRetries} retries. API quota may be exhausted.`);
+			}
+
+			const delay = Math.min(
+				this.baseDelay * Math.pow(2, retries),
+				this.maxDelay
+			);
+
+			console.log(`🚦 Rate limit approached - backing off ${delay}ms (retry ${retries + 1}/${this.maxRetries})`);
+
+			this.retryCount.set(id, retries + 1);
+			await new Promise(resolve => setTimeout(resolve, delay));
+
+			return this.waitForSlot(id);
+		}
+
+		// Record this request and clear retry count
+		this.requests.push(now);
+		this.retryCount.delete(id);
+
+		console.log(`✅ Rate limiter: ${this.requests.length}/${this.maxRequests} requests in current window`);
+		return true;
+	}
+
+	// Handle 429 response by setting rate limit flag
+	handleRateLimit(retryAfterSeconds = 60) {
+		this.isRateLimited = true;
+		this.rateLimitResetTime = Date.now() + (retryAfterSeconds * 1000);
+		this.consecutiveFailures++;
+
+		console.log(`🔴 Rate limit detected (failure #${this.consecutiveFailures}) - will retry after ${retryAfterSeconds}s`);
+
+		// Activate circuit breaker if too many failures
+		if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+			this.circuitBreakerResetTime = Date.now() + (5 * 60 * 1000); // 5 minutes
+			console.log(`🚫 Circuit breaker activated - cooling down for 5 minutes`);
+		}
+	}
+
+	// Handle successful request
+	handleSuccess() {
+		this.consecutiveFailures = 0;
+		this.circuitBreakerResetTime = null;
+	}
+
+	// Get current status for monitoring
+	getStatus() {
+		const now = Date.now();
+		this.requests = this.requests.filter(timestamp => now - timestamp < this.windowMs);
+
+		return {
+			requestsInWindow: this.requests.length,
+			maxRequests: this.maxRequests,
+			isRateLimited: this.isRateLimited,
+			timeUntilReset: this.rateLimitResetTime > now ? this.rateLimitResetTime - now : 0,
+			availableSlots: Math.max(0, this.maxRequests - this.requests.length),
+			consecutiveFailures: this.consecutiveFailures,
+			circuitBreakerActive: this.consecutiveFailures >= this.maxConsecutiveFailures,
+			circuitBreakerResetTime: this.circuitBreakerResetTime
+		};
+	}
+}
+
+// 🎯 CREATE GLOBAL RATE LIMITER INSTANCE
+const geminiRateLimiter = new ProductionRateLimiter({
+	maxRequests: 6,    // Very conservative
+	windowMs: 60000,   // 1 minute
+	maxRetries: 3,
+	baseDelay: 2000    // 2 second initial delay
+});
+
 // SMART Guidelines Engine - loaded dynamically when needed
 let SMARTGuidelinesEngine = null;
 let smartGuidelinesLoading = false;
@@ -33,7 +160,7 @@ const loadSMARTGuidelines = async () => {
 	}
 
 	if (smartGuidelinesLoadError) {
-		return null; // Don't retry if previously failed
+		return null;
 	}
 
 	smartGuidelinesLoading = true;
@@ -57,6 +184,7 @@ export const AI_ERROR_TYPES = {
 	NO_API_KEY: 'no_api_key',
 	OFFLINE: 'offline',
 	RATE_LIMITED: 'rate_limited',
+	CIRCUIT_BREAKER: 'circuit_breaker',
 	NETWORK_ERROR: 'network_error',
 	INVALID_RESPONSE: 'invalid_response',
 	CONTEXT_TOO_LARGE: 'context_too_large',
@@ -66,37 +194,10 @@ export const AI_ERROR_TYPES = {
 
 // Confidence levels for AI responses
 export const CONFIDENCE_LEVELS = {
-	HIGH: 'high',      // >90% certain, comprehensive data
-	MEDIUM: 'medium',  // 70-90% certain, good data
-	LOW: 'low',        // 50-70% certain, limited data
-	VERY_LOW: 'very_low' // <50% certain, insufficient data
-};
-
-// Check online status with multiple fallback methods
-const checkOnlineStatus = async () => {
-	if (typeof navigator === 'undefined') return false;
-
-	// Primary check
-	if (!navigator.onLine) return false;
-
-	// Secondary check with actual network request
-	try {
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-		const response = await fetch('https://www.google.com/favicon.ico', {
-			method: 'HEAD',
-			mode: 'no-cors',
-			signal: controller.signal,
-			cache: 'no-cache'
-		});
-
-		clearTimeout(timeoutId);
-		return true;
-	} catch (error) {
-		console.log('Network connectivity test failed:', error.message);
-		return false;
-	}
+	HIGH: 'high',
+	MEDIUM: 'medium',
+	LOW: 'low',
+	VERY_LOW: 'very_low'
 };
 
 // Enhanced error classification
@@ -106,7 +207,10 @@ const classifyError = (error) => {
 
 	const errorMessage = error.message?.toLowerCase() || '';
 
-	if (errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+	if (errorMessage.includes('circuit breaker')) {
+		return AI_ERROR_TYPES.CIRCUIT_BREAKER;
+	}
+	if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
 		return AI_ERROR_TYPES.RATE_LIMITED;
 	}
 	if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
@@ -125,9 +229,73 @@ const classifyError = (error) => {
 	return AI_ERROR_TYPES.UNKNOWN;
 };
 
+// Check online status with multiple fallback methods
+const checkOnlineStatus = async () => {
+	if (typeof navigator === 'undefined') return false;
+
+	if (!navigator.onLine) return false;
+
+	try {
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+		await fetch('https://www.google.com/favicon.ico', {
+			method: 'HEAD',
+			mode: 'no-cors',
+			signal: controller.signal,
+			cache: 'no-cache'
+		});
+
+		clearTimeout(timeoutId);
+		return true;
+	} catch (error) {
+		console.log('Network connectivity test failed:', error.message);
+		return false;
+	}
+};
+
+// 🎯 RATE-LIMITED API CALL WRAPPER
+const makeRateLimitedAPICall = async (prompt, requestId = null) => {
+	// Wait for rate limiter slot
+	await geminiRateLimiter.waitForSlot(requestId);
+
+	try {
+		console.log('🤖 Making API call to Gemini...');
+
+		const response = await ai.models.generateContent({
+			model: "gemini-2.0-flash-exp",
+			contents: [{ role: "user", parts: [{ text: prompt }] }]
+		});
+
+		// Handle successful request
+		geminiRateLimiter.handleSuccess();
+
+		// FIXED: Access response text correctly for new API format
+		const responseText = response.response?.text() || response.text;
+
+		if (!responseText || typeof responseText !== 'string') {
+			throw new Error('Invalid response format from AI service');
+		}
+
+		console.log('✅ AI response received, length:', responseText.length);
+		return responseText;
+
+	} catch (error) {
+		console.error('API call failed:', error);
+
+		// Handle rate limiting specifically
+		if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+			// Try to extract retry-after header value, default to 60 seconds
+			const retryAfter = 60; // Could parse from error if available
+			geminiRateLimiter.handleRateLimit(retryAfter);
+		}
+
+		throw error;
+	}
+};
+
 // Get applicable WHO SMART Guidelines
 const getApplicableGuidelines = async (patientData, context) => {
-	// Try to load SMART Guidelines engine
 	const SMARTEngine = await loadSMARTGuidelines();
 
 	if (!SMARTEngine) {
@@ -148,7 +316,6 @@ const getApplicableGuidelines = async (patientData, context) => {
 		return guidelines;
 	} catch (error) {
 		console.warn('Could not retrieve SMART Guidelines:', error);
-		// Fallback to expanded guidelines
 		return await getRelevantGuidelines(patientData?.symptoms || '', patientData);
 	}
 };
@@ -160,7 +327,7 @@ const determineClinicalDomain = (patientData, context) => {
 	}
 
 	if (patientData?.age && patientData.age < 5) {
-		return 'infectious-diseases'; // IMCI domain
+		return 'infectious-diseases';
 	}
 
 	const symptoms = patientData?.symptoms || '';
@@ -191,15 +358,27 @@ const calculateConfidence = (patientData, relevantGuidelines, queryComplexity) =
 	if (patientData?.medicalHistory) score += 5;
 	if (patientData?.age && patientData?.gender) score += 5;
 
+	// Handle different relevantGuidelines structures safely
+	let guidelineCount = 0;
+	let hasBasicGuidelines = false;
+
+	if (relevantGuidelines?.recommendations && Array.isArray(relevantGuidelines.recommendations)) {
+		guidelineCount = relevantGuidelines.recommendations.length;
+		hasBasicGuidelines = relevantGuidelines.recommendations.some(g =>
+			g.resourceConstraints?.includes && g.resourceConstraints.includes('basic-infrastructure')
+		);
+	} else if (Array.isArray(relevantGuidelines)) {
+		guidelineCount = relevantGuidelines.length;
+		hasBasicGuidelines = relevantGuidelines.some(g => g.resourceLevel === 'basic');
+	} else if (relevantGuidelines?.length) {
+		guidelineCount = relevantGuidelines.length;
+	}
+
 	// Relevant guidelines available (0-30 points)
-	const guidelineCount = relevantGuidelines?.recommendations?.length || relevantGuidelines?.length || 0;
 	if (guidelineCount >= 3) score += 20;
 	else if (guidelineCount >= 2) score += 15;
 	else if (guidelineCount >= 1) score += 10;
 
-	// Check for resource-appropriate guidelines
-	const hasBasicGuidelines = relevantGuidelines?.recommendations?.some(g => g.resourceConstraints?.includes('basic-infrastructure')) ||
-		relevantGuidelines?.some(g => g.resourceLevel === 'basic');
 	if (hasBasicGuidelines) score += 10;
 
 	// Query complexity (0-30 points)
@@ -243,30 +422,8 @@ const getRuleBasedRecommendation = (symptoms, patientData, relevantGuidelines) =
 This is WHO IMCI guideline-based advice. Clinical judgment essential.`,
 				confidence: CONFIDENCE_LEVELS.MEDIUM,
 				isRuleBased: true,
-				sourceGuidelines: relevantGuidelines?.filter(g => g.category === 'Respiratory')
-			};
-		} else {
-			return {
-				text: `Based on clinical guidelines for adult respiratory infection:
-
-**ASSESSMENT:**
-- Vital signs including oxygen saturation
-- Chest examination
-- Severity assessment
-
-**LIKELY MANAGEMENT:**
-- Mild: Amoxicillin 1g three times daily for 5-7 days
-- Severe: Consider hospital referral
-- Symptomatic: Paracetamol, adequate fluids
-
-**MONITOR FOR:**
-- Worsening breathlessness
-- High fever >39°C
-- Chest pain
-
-Clinical assessment essential for accurate diagnosis.`,
-				confidence: CONFIDENCE_LEVELS.MEDIUM,
-				isRuleBased: true
+				method: 'rule-based-pediatric-respiratory',
+				sourceGuidelines: relevantGuidelines?.filter?.(g => g.category === 'Respiratory')
 			};
 		}
 	}
@@ -296,7 +453,8 @@ Clinical assessment essential for accurate diagnosis.`,
 
 This is WHO guideline-based advice. Clinical assessment required.`,
 			confidence: CONFIDENCE_LEVELS.MEDIUM,
-			isRuleBased: true
+			isRuleBased: true,
+			method: 'rule-based-diarrhea-management'
 		};
 	}
 
@@ -329,7 +487,8 @@ This is WHO guideline-based advice. Clinical assessment required.`,
 
 This is WHO guideline-based advice. Diagnostic testing recommended when available.`,
 				confidence: CONFIDENCE_LEVELS.MEDIUM,
-				isRuleBased: true
+				isRuleBased: true,
+				method: 'rule-based-malaria-management'
 			};
 		}
 	}
@@ -364,12 +523,13 @@ This is WHO guideline-based advice. Diagnostic testing recommended when availabl
 This requires immediate clinical assessment and likely hospital care.`,
 				confidence: CONFIDENCE_LEVELS.HIGH,
 				isRuleBased: true,
+				method: 'rule-based-maternal-emergency',
 				urgency: 'immediate'
 			};
 		}
 	}
 
-	// Generic response if no specific match
+	// Generic response
 	return {
 		text: `Based on available clinical guidelines:
 
@@ -392,11 +552,12 @@ This requires immediate clinical assessment and likely hospital care.`,
 Clinical guidelines available in reference section. Professional judgment essential for diagnosis and treatment decisions.`,
 		confidence: CONFIDENCE_LEVELS.LOW,
 		isRuleBased: true,
+		method: 'rule-based-generic',
 		isGeneric: true
 	};
 };
 
-// Enhanced clinical recommendations with SMART Guidelines integration
+// 🎯 MAIN ENHANCED CLINICAL RECOMMENDATIONS FUNCTION WITH RATE LIMITING
 export async function getEnhancedClinicalRecommendations(
 	query,
 	patientData,
@@ -405,13 +566,14 @@ export async function getEnhancedClinicalRecommendations(
 ) {
 	const {
 		maxRetries = 2,
-		timeoutMs = 10000,
+		timeoutMs = 15000, // Increased timeout
 		fallbackToRules = true,
 		saveForLater = true
 	} = options;
 
 	const startTime = performance.now();
 	let smartRecommendations = null;
+	const requestId = `clinical_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 	// Determine query complexity
 	const queryComplexity = query.length > 200 ? 'complex' :
@@ -422,7 +584,6 @@ export async function getEnhancedClinicalRecommendations(
 		smartRecommendations = await getApplicableGuidelines(patientData, options.context);
 		console.log('Retrieved SMART Guidelines:', smartRecommendations?.recommendations?.length || 0);
 
-		// Use SMART guidelines for relevantMedicalData if not provided
 		if (!relevantMedicalData && smartRecommendations) {
 			relevantMedicalData = { guidelines: smartRecommendations };
 		}
@@ -430,16 +591,25 @@ export async function getEnhancedClinicalRecommendations(
 		console.warn('Error retrieving SMART Guidelines:', error);
 	}
 
-	// Calculate confidence based on available data (including SMART guidelines)
+	// Calculate confidence based on available data
 	const confidence = calculateConfidence(patientData, smartRecommendations, queryComplexity);
 
 	// Check if we're offline or have no API key
 	const isOnline = await checkOnlineStatus();
 
-	if (!isOnline || !API_KEY || !ai) {
-		console.log('Offline or no API key - using rule-based fallback with SMART Guidelines');
+	// Check rate limiter status before attempting AI
+	const rateLimiterStatus = geminiRateLimiter.getStatus();
+	console.log('🚦 Rate limiter status:', rateLimiterStatus);
 
-		if (saveForLater) {
+	if (!isOnline || !API_KEY || !ai || rateLimiterStatus.circuitBreakerActive) {
+		const errorType = !API_KEY ? AI_ERROR_TYPES.NO_API_KEY :
+			!isOnline ? AI_ERROR_TYPES.OFFLINE :
+				rateLimiterStatus.circuitBreakerActive ? AI_ERROR_TYPES.CIRCUIT_BREAKER :
+					AI_ERROR_TYPES.UNKNOWN;
+
+		console.log(`Using rule-based fallback due to: ${errorType}`);
+
+		if (saveForLater && isOnline) {
 			await offlineQueryDb.add({
 				query,
 				patientData,
@@ -461,7 +631,8 @@ export async function getEnhancedClinicalRecommendations(
 			return {
 				...ruleBasedResult,
 				smartGuidelines: smartRecommendations,
-				errorType: !API_KEY ? AI_ERROR_TYPES.NO_API_KEY : AI_ERROR_TYPES.OFFLINE,
+				errorType,
+				rateLimiterStatus,
 				timestamp: new Date(),
 				queryId: generateQueryId(),
 				responseTime: performance.now() - startTime
@@ -469,12 +640,13 @@ export async function getEnhancedClinicalRecommendations(
 		}
 
 		return {
-			text: `You're currently offline and no cached recommendations are available. Your query has been saved and will be processed when connectivity is restored.
-      
+			text: `Clinical recommendations temporarily unavailable due to ${errorType.replace('_', ' ')}. Your query has been saved and will be processed when connectivity is restored.
+
 Please refer to the clinical guidelines in the Reference section for immediate guidance.`,
 			confidence: CONFIDENCE_LEVELS.VERY_LOW,
 			smartGuidelines: smartRecommendations,
-			errorType: !API_KEY ? AI_ERROR_TYPES.NO_API_KEY : AI_ERROR_TYPES.OFFLINE,
+			errorType,
+			rateLimiterStatus,
 			timestamp: new Date(),
 			queryId: generateQueryId(),
 			responseTime: performance.now() - startTime,
@@ -482,13 +654,10 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 		};
 	}
 
-	// Attempt AI recommendation with retries
+	// 🎯 ATTEMPT AI RECOMMENDATION WITH PROPER RATE LIMITING
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
 		try {
-			console.log(`AI recommendation attempt ${attempt}/${maxRetries}`);
-
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+			console.log(`🤖 AI recommendation attempt ${attempt}/${maxRetries} with rate limiting...`);
 
 			// Generate enhanced context with SMART Guidelines
 			const context = await generateEnhancedContext(patientData, relevantMedicalData, smartRecommendations);
@@ -496,20 +665,8 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 			// Create comprehensive prompt with SMART Guidelines
 			const prompt = createEnhancedPromptWithSMART(query, context, confidence, smartRecommendations);
 
-			// FIXED: Use correct Google GenAI API pattern
-			const response = await ai.models.generateContent({
-				model: "gemini-2.0-flash-exp",
-				contents: prompt
-			});
-
-			clearTimeout(timeoutId);
-
-			// FIXED: Access response text correctly
-			const responseText = response.text;
-
-			if (!responseText || typeof responseText !== 'string') {
-				throw new Error('Invalid response format from AI service');
-			}
+			// 🎯 USE RATE-LIMITED API CALL
+			const responseText = await makeRateLimitedAPICall(prompt, `${requestId}_attempt_${attempt}`);
 
 			// Validate response quality and against SMART Guidelines
 			const validationResult = validateAIResponse(responseText, query);
@@ -524,7 +681,7 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 						smartRecommendations?.recommendations || relevantMedicalData?.guidelines
 					);
 				}
-				continue; // Retry
+				continue;
 			}
 
 			const finalConfidence = calculateConfidenceScore(
@@ -545,7 +702,9 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 				queryId: generateQueryId(),
 				retryCount: attempt - 1,
 				responseTime: performance.now() - startTime,
-				sources: extractSources(smartRecommendations)
+				sources: extractSources(smartRecommendations),
+				rateLimiterStatus: geminiRateLimiter.getStatus(),
+				method: 'ai-enhanced'
 			};
 
 		} catch (error) {
@@ -557,27 +716,25 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 				error: error.message,
 				errorType,
 				attempt,
-				query: query.substring(0, 100), // Truncate for privacy
-				timestamp: new Date().toISOString()
+				query: query.substring(0, 100),
+				timestamp: new Date().toISOString(),
+				rateLimiterStatus: geminiRateLimiter.getStatus()
 			});
 
 			// Handle specific error types
-			if (errorType === AI_ERROR_TYPES.RATE_LIMITED) {
-				const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff
-				console.log(`Rate limited, waiting ${waitTime}ms before retry`);
-				await new Promise(resolve => setTimeout(resolve, waitTime));
-				continue;
+			if (errorType === AI_ERROR_TYPES.RATE_LIMITED || errorType === AI_ERROR_TYPES.CIRCUIT_BREAKER) {
+				console.log('Rate limiting encountered, switching to rule-based fallback');
+				break; // Don't retry on rate limit
 			}
 
 			if (errorType === AI_ERROR_TYPES.CONTEXT_TOO_LARGE) {
 				console.log('Context too large, truncating and retrying');
-				// Truncate context and retry
 				patientData = truncatePatientData(patientData);
 				relevantMedicalData = truncateMedicalData(relevantMedicalData);
 				continue;
 			}
 
-			// If final attempt fails and fallback enabled
+			// If final attempt fails
 			if (attempt === maxRetries) {
 				if (saveForLater) {
 					await offlineQueryDb.add({
@@ -587,7 +744,7 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 						smartRecommendations,
 						type: 'clinical',
 						timestamp: new Date().toISOString(),
-						priority: 'high', // Higher priority since AI failed
+						priority: 'high',
 						error: error.message
 					});
 				}
@@ -606,7 +763,8 @@ Please refer to the clinical guidelines in the Reference section for immediate g
 						originalError: error.message,
 						timestamp: new Date(),
 						queryId: generateQueryId(),
-						responseTime: performance.now() - startTime
+						responseTime: performance.now() - startTime,
+						rateLimiterStatus: geminiRateLimiter.getStatus()
 					};
 				}
 
@@ -621,6 +779,7 @@ Your query has been saved and will be processed when possible. Please refer to c
 					timestamp: new Date(),
 					queryId: generateQueryId(),
 					responseTime: performance.now() - startTime,
+					rateLimiterStatus: geminiRateLimiter.getStatus(),
 					isError: true
 				};
 			}
@@ -628,7 +787,7 @@ Your query has been saved and will be processed when possible. Please refer to c
 	}
 }
 
-// Helper functions
+// Helper functions (keeping existing implementations but adding rate limiter status)
 const generateQueryId = () => {
 	return 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 };
@@ -645,7 +804,6 @@ const generateEnhancedContext = async (patientData, relevantMedicalData, smartRe
 		if (patientData.gestationalAge) context += `Gestational age: ${patientData.gestationalAge} weeks\n`;
 	}
 
-	// Add WHO SMART Guidelines context
 	if (smartRecommendations?.recommendations?.length > 0) {
 		context += `\nWHO SMART GUIDELINES RECOMMENDATIONS:\n`;
 		smartRecommendations.recommendations.slice(0, 3).forEach((rec, idx) => {
@@ -657,7 +815,6 @@ const generateEnhancedContext = async (patientData, relevantMedicalData, smartRe
 		});
 	}
 
-	// Add expanded guidelines if available
 	if (relevantMedicalData?.guidelines?.length > 0 && !smartRecommendations) {
 		context += `\nRELEVANT GUIDELINES:\n`;
 		relevantMedicalData.guidelines.slice(0, 2).forEach(guide => {
@@ -700,7 +857,7 @@ Prioritize patient safety and evidence-based care.`;
 	return prompt;
 };
 
-// Validate AI response against WHO SMART Guidelines
+// Keep existing helper functions
 const validateWithGuidelines = (responseText, smartRecommendations) => {
 	if (!smartRecommendations || !smartRecommendations.recommendations) {
 		return {
@@ -713,10 +870,8 @@ const validateWithGuidelines = (responseText, smartRecommendations) => {
 
 	const conflicts = [];
 	const supportedRecommendations = [];
-
 	const responseText_lower = responseText.toLowerCase();
 
-	// Check for conflicts with WHO recommendations
 	for (const guideline of smartRecommendations.recommendations) {
 		const guidelineKey = guideline.title.toLowerCase();
 		const descriptionKey = guideline.description.toLowerCase().substring(0, 50);
@@ -739,9 +894,8 @@ const validateWithGuidelines = (responseText, smartRecommendations) => {
 	};
 };
 
-// Calculate final confidence score
 const calculateConfidenceScore = (validatedResponse, smartRecommendations) => {
-	let confidence = 0.5; // Base confidence
+	let confidence = 0.5;
 
 	if (validatedResponse.validation?.score > 0.8) {
 		confidence += 0.3;
@@ -760,7 +914,6 @@ const calculateConfidenceScore = (validatedResponse, smartRecommendations) => {
 	return Math.min(confidence, 1.0);
 };
 
-// Extract sources for citation
 const extractSources = (smartRecommendations) => {
 	const sources = [];
 
@@ -784,14 +937,12 @@ const validateAIResponse = (responseText, originalQuery) => {
 	let isValid = true;
 	let reason = '';
 
-	// Basic length check
 	if (responseText.length < 100) {
 		isValid = false;
 		reason = 'Response too short';
 		return { isValid, reason, score };
 	}
 
-	// Check for structured content
 	const hasAssessment = /assessment/i.test(responseText);
 	const hasManagement = /management/i.test(responseText);
 	const hasRedFlags = /red flag|urgent|refer/i.test(responseText);
@@ -800,7 +951,6 @@ const validateAIResponse = (responseText, originalQuery) => {
 	if (hasManagement) score += 35;
 	if (hasRedFlags) score += 20;
 
-	// Check for clinical relevance
 	const clinicalTerms = /diagnosis|treatment|symptom|patient|condition|medication/gi;
 	const clinicalMatches = responseText.match(clinicalTerms);
 	if (clinicalMatches && clinicalMatches.length >= 3) score += 20;
@@ -820,7 +970,9 @@ const getErrorMessage = (errorType) => {
 		case AI_ERROR_TYPES.OFFLINE:
 			return 'no internet connection';
 		case AI_ERROR_TYPES.RATE_LIMITED:
-			return 'too many requests - please wait';
+			return 'API rate limit reached - using offline guidelines';
+		case AI_ERROR_TYPES.CIRCUIT_BREAKER:
+			return 'too many API failures - cooling down';
 		case AI_ERROR_TYPES.NETWORK_ERROR:
 			return 'network connectivity issues';
 		case AI_ERROR_TYPES.CONTEXT_TOO_LARGE:
@@ -848,38 +1000,64 @@ const truncateMedicalData = (medicalData) => {
 
 	return {
 		...medicalData,
-		guidelines: medicalData.guidelines?.slice(0, 2) // Limit to 2 most relevant
+		guidelines: medicalData.guidelines?.slice(0, 2)
 	};
 };
 
-// Function to process queued offline queries
+// Enhanced function for integration with existing ATLAS code
+export async function enhancedGeminiWithSMART(query, patientData, context = {}) {
+	return await getEnhancedClinicalRecommendations(
+		query,
+		patientData,
+		null,
+		{
+			context,
+			fallbackToRules: true,
+			saveForLater: true,
+			maxRetries: 2
+		}
+	);
+}
+
+// Function to get rate limiter status for monitoring
+export function getRateLimiterStatus() {
+	return geminiRateLimiter.getStatus();
+}
+
+// Function to process queued offline queries with rate limiting
 export async function processOfflineQueriesEnhanced() {
 	if (!await checkOnlineStatus() || !ai) {
 		return { processed: 0, errors: 0 };
+	}
+
+	// Check if circuit breaker is active
+	const status = geminiRateLimiter.getStatus();
+	if (status.circuitBreakerActive) {
+		console.log('Circuit breaker active - skipping offline query processing');
+		return { processed: 0, errors: 0, circuitBreakerActive: true };
 	}
 
 	const offlineQueries = await offlineQueryDb.getAll();
 	let processed = 0;
 	let errors = 0;
 
-	// Sort by priority and timestamp
 	const sortedQueries = offlineQueries.sort((a, b) => {
 		if (a.priority === 'high' && b.priority !== 'high') return -1;
 		if (b.priority === 'high' && a.priority !== 'high') return 1;
 		return new Date(a.timestamp) - new Date(b.timestamp);
 	});
 
-	for (const query of sortedQueries.slice(0, 10)) { // Process max 10 at a time
+	// Process fewer queries to avoid rate limiting
+	for (const query of sortedQueries.slice(0, 5)) {
 		try {
 			const result = await getEnhancedClinicalRecommendations(
 				query.query,
 				query.patientData,
 				query.relevantMedicalData,
-				{ maxRetries: 1, saveForLater: false, context: query.context } // Don't re-queue
+				{ maxRetries: 1, saveForLater: false, context: query.context }
 			);
 
 			if (!result.isError) {
-				// Store processed result for potential retrieval
 				await syncQueueDb.addToQueue('processed_queries', query.id, 'add', {
 					originalQuery: query,
 					result,
@@ -895,23 +1073,19 @@ export async function processOfflineQueriesEnhanced() {
 		} catch (error) {
 			console.error(`Error processing offline query ${query.id}:`, error);
 			errors++;
+
+			// If rate limited during processing, stop
+			if (error.message?.includes('rate limit') || error.message?.includes('Circuit breaker')) {
+				console.log('Rate limit hit during offline processing - stopping');
+				break;
+			}
 		}
 	}
 
-	return { processed, errors };
-}
-
-// Enhanced function specifically for SMART Guidelines integration
-export async function enhancedGeminiWithSMART(query, patientData, context = {}) {
-	return await getEnhancedClinicalRecommendations(
-		query,
-		patientData,
-		null, // Will be populated by SMART Guidelines
-		{
-			context,
-			fallbackToRules: true,
-			saveForLater: true,
-			maxRetries: 2
-		}
-	);
+	return {
+		processed,
+		errors,
+		rateLimiterStatus: geminiRateLimiter.getStatus(),
+		remainingQueries: offlineQueries.length - processed - errors
+	};
 }

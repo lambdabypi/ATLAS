@@ -1,3 +1,327 @@
-﻿/* src/styles/components.css */
+﻿/* src/styles/components.css - UPDATED with better centering */
 /* Component-specific styles */
-/* Add any custom component styles here that can't be handled by the utility classes */
+
+/* Custom CSS Variables for consistent theming */
+:root {
+	--atlas-primary: #3b82f6;
+	--atlas-secondary: #6366f1;
+	--atlas-success: #10b981;
+	--atlas-warning: #f59e0b;
+	--atlas-error: #ef4444;
+	--atlas-gray-50: #f8fafc;
+	--atlas-gray-100: #f1f5f9;
+	--atlas-gray-200: #e2e8f0;
+	--atlas-gray-300: #cbd5e1;
+	--atlas-gray-600: #475569;
+	--atlas-gray-700: #334155;
+	--atlas-gray-900: #0f172a;
+	--atlas-blue-50: #eff6ff;
+	--atlas-blue-100: #dbeafe;
+	--atlas-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+	--atlas-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+	--atlas-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+	--atlas-border-radius: 12px;
+	--atlas-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* FIXED: Clean background with proper positioning */
+.atlas-backdrop {
+	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+	min-height: 100vh;
+	width: 100vw;
+	position: relative;
+	margin: 0;
+	padding: 0;
+	/* Ensure full viewport coverage */
+	box-sizing: border-box;
+}
+
+/* FIXED: Main centering container */
+.atlas-page-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	width: 100%;
+	padding: 2rem 0;
+	box-sizing: border-box;
+}
+
+/* FIXED: Content wrapper with proper constraints */
+.atlas-content-wrapper {
+	width: 100%;
+	max-width: 56rem;
+	/* 896px - equivalent to max-w-4xl */
+	margin: 0 auto;
+	padding: 0 1.5rem;
+	box-sizing: border-box;
+}
+
+/* FIXED: Header centering */
+.atlas-header-center {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	width: 100%;
+}
+
+/* FIXED: Status bar with proper flex centering */
+.atlas-status-bar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 1.5rem;
+	width: 100%;
+	flex-wrap: wrap;
+}
+
+/* Ensure body and html don't interfere with centering */
+body,
+html {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+}
+
+/* Ensure main containers don't interfere with centering */
+main {
+	width: 100%;
+	display: block;
+}
+
+/* Logo with subtle styling */
+.atlas-logo {
+	background: linear-gradient(135deg, var(--atlas-primary), var(--atlas-secondary));
+	box-shadow: var(--atlas-shadow-sm);
+	transition: var(--atlas-transition);
+	border-radius: 10px;
+}
+
+.atlas-logo:hover {
+	transform: translateY(-1px);
+	box-shadow: var(--atlas-shadow-md);
+}
+
+/* Clean title without overwhelming effects */
+.atlas-title {
+	color: var(--atlas-gray-900);
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+/* Improved status indicators */
+.atlas-status {
+	font-weight: 500;
+	font-size: 0.875rem;
+	transition: var(--atlas-transition);
+	backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.atlas-status-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+/* Primary action cards - clean and professional */
+.atlas-card-primary {
+	background: white;
+	border: 1px solid var(--atlas-gray-200);
+	border-radius: var(--atlas-border-radius);
+	box-shadow: var(--atlas-shadow-sm);
+	transition: var(--atlas-transition);
+	position: relative;
+	overflow: hidden;
+}
+
+.atlas-card-primary:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--atlas-shadow-lg);
+	border-color: var(--atlas-primary);
+}
+
+/* Secondary action cards - consistent styling */
+.atlas-card-secondary {
+	background: white;
+	border: 1px solid var(--atlas-gray-200);
+	border-radius: var(--atlas-border-radius);
+	box-shadow: var(--atlas-shadow-sm);
+	transition: var(--atlas-transition);
+}
+
+.atlas-card-secondary:hover {
+	transform: translateY(-1px);
+	box-shadow: var(--atlas-shadow-md);
+	border-color: var(--atlas-gray-300);
+}
+
+/* Icon containers with consistent styling */
+.atlas-icon-primary {
+	background: var(--atlas-blue-50);
+	border-radius: 8px;
+	transition: var(--atlas-transition);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.atlas-card-primary:hover .atlas-icon-primary {
+	background: var(--atlas-blue-100);
+	transform: scale(1.05);
+}
+
+.atlas-icon-secondary {
+	transition: var(--atlas-transition);
+	flex-shrink: 0;
+}
+
+.atlas-card-secondary:hover .atlas-icon-secondary {
+	transform: scale(1.1);
+}
+
+/* Keyboard shortcut indicators */
+.atlas-shortcut {
+	font-family: ui-monospace, 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+	font-size: 0.75rem;
+	color: var(--atlas-gray-600);
+	background: var(--atlas-gray-100);
+	padding: 4px 8px;
+	border-radius: 6px;
+	border: 1px solid var(--atlas-gray-200);
+	opacity: 0;
+	transform: translateY(4px);
+	transition: var(--atlas-transition);
+}
+
+.atlas-card:hover .atlas-shortcut {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* Section headers */
+.atlas-section-header {
+	color: var(--atlas-gray-700);
+	font-weight: 600;
+	font-size: 0.875rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	margin-bottom: 16px;
+	padding-left: 4px;
+}
+
+/* Help footer */
+.atlas-help-footer {
+	background: rgba(255, 255, 255, 0.8);
+	backdrop-filter: blur(10px);
+	color: var(--atlas-gray-600);
+	font-size: 0.875rem;
+	padding: 12px 20px;
+	border-radius: 50px;
+	border: 1px solid var(--atlas-gray-200);
+	transition: var(--atlas-transition);
+}
+
+.atlas-help-footer:hover {
+	background: rgba(255, 255, 255, 0.95);
+	border-color: var(--atlas-gray-300);
+}
+
+/* Error notification */
+.atlas-error-notification {
+	background: white;
+	border: 1px solid #fecaca;
+	box-shadow: var(--atlas-shadow-lg);
+	border-radius: var(--atlas-border-radius);
+	animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+	from {
+		opacity: 0;
+		transform: translateY(16px) scale(0.95);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* Loading spinner */
+.atlas-spinner {
+	width: 16px;
+	height: 16px;
+	border: 2px solid var(--atlas-primary);
+	border-top-color: transparent;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	flex-shrink: 0;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Focus states */
+.atlas-card:focus-visible {
+	outline: 2px solid var(--atlas-primary);
+	outline-offset: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.atlas-page-container {
+		padding: 1rem 0;
+		align-items: flex-start;
+	}
+
+	.atlas-content-wrapper {
+		padding: 0 1rem;
+	}
+
+	.atlas-status-bar {
+		gap: 1rem;
+		flex-direction: column;
+	}
+
+	.atlas-status-bar>* {
+		width: 100%;
+		justify-content: center;
+	}
+}
+
+@media (max-width: 640px) {
+	.atlas-card-primary {
+		padding: 20px;
+	}
+
+	.atlas-card-secondary {
+		padding: 16px;
+	}
+
+	.atlas-title {
+		font-size: 2.5rem;
+	}
+
+	.atlas-content-wrapper {
+		max-width: 100%;
+	}
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

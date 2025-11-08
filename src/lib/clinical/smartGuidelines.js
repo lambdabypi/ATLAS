@@ -19,7 +19,8 @@ export const SMART_LAYERS = {
 export const CLINICAL_DOMAINS = {
 	MATERNAL_HEALTH: 'maternal-health',
 	INFECTIOUS_DISEASES: 'infectious-diseases',
-	NCDS: 'non-communicable-diseases'
+	NCDS: 'non-communicable-diseases',
+	GENERAL_MEDICINE: 'general-medicine' // Added missing domain
 };
 
 // L2: FHIR-based Machine-Readable Guidelines
@@ -65,6 +66,28 @@ export const FHIR_GUIDELINES = {
 				trigger: 'immunization-history-check',
 				evidence: 'Moderate quality evidence (WHO Strong Recommendation)',
 				resourceConstraints: ['vaccine-cold-chain', 'trained-staff']
+			},
+			{
+				id: 'anc-03',
+				title: 'Preeclampsia Management',
+				condition: {
+					code: 'O14.9', // Preeclampsia, unspecified
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['severe headache', 'visual disturbances', 'epigastric pain'],
+					bloodPressure: '>140/90'
+				},
+				action: {
+					title: 'Urgent Preeclampsia Care',
+					description: 'Immediate assessment, blood pressure control with methyldopa, prepare magnesium sulfate, urgent referral required',
+					type: 'urgent-referral',
+					resource: 'ServiceRequest'
+				},
+				trigger: 'preeclampsia-symptoms',
+				strength: 'strong',
+				evidence: 'WHO Strong Recommendation - Maternal Health',
+				resourceConstraints: ['blood-pressure-monitor', 'antihypertensive-medications', 'referral-capability']
 			}
 		]
 	},
@@ -123,6 +146,29 @@ export const FHIR_GUIDELINES = {
 				},
 				evidence: 'High quality evidence (WHO Strong Recommendation)',
 				resourceConstraints: ['basic-infrastructure', 'ors-availability']
+			},
+			{
+				id: 'imci-malaria',
+				title: 'Malaria Management',
+				condition: {
+					code: 'B54', // Unspecified malaria
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['fever', 'headache', 'body aches', 'chills'],
+					testResult: 'rdt-positive'
+				},
+				action: {
+					title: 'Antimalarial Treatment',
+					description: 'Artemether-lumefantrine for uncomplicated malaria, complete full course',
+					medication: {
+						code: 'P01BF01',
+						system: 'http://www.whocc.no/atc',
+						display: 'Artemether-lumefantrine'
+					}
+				},
+				evidence: 'High quality evidence (WHO Strong Recommendation)',
+				resourceConstraints: ['basic-infrastructure', 'antimalarial-availability']
 			}
 		]
 	},
@@ -156,6 +202,143 @@ export const FHIR_GUIDELINES = {
 				},
 				evidence: 'High quality evidence (WHO Strong Recommendation)',
 				resourceConstraints: ['basic-infrastructure', 'bp-monitor', 'medication-availability']
+			}
+		]
+	},
+
+	// ADD THE MISSING GENERAL MEDICINE DOMAIN
+	[CLINICAL_DOMAINS.GENERAL_MEDICINE]: {
+		id: 'who-general-medicine-2024',
+		title: 'WHO General Medicine Guidelines',
+		version: '1.0.0',
+		status: 'active',
+		description: 'WHO recommendations for general medical conditions in primary care',
+		recommendations: [
+			{
+				id: 'gm-01',
+				title: 'Fever Management',
+				condition: {
+					code: 'R50.9', // Fever, unspecified
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['fever', 'temperature', 'hot']
+				},
+				action: {
+					title: 'Fever Assessment and Management',
+					description: 'Assess for danger signs, provide paracetamol for comfort, ensure adequate fluid intake',
+					type: 'assessment',
+					resource: 'ClinicalImpression'
+				},
+				trigger: 'fever-complaint',
+				strength: 'strong',
+				evidence: 'WHO Clinical Guidelines',
+				resourceConstraints: ['thermometer', 'paracetamol']
+			},
+			{
+				id: 'gm-02',
+				title: 'Headache Assessment',
+				condition: {
+					code: 'R51', // Headache
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['headache', 'head pain', 'severe headache']
+				},
+				action: {
+					title: 'Headache Evaluation',
+					description: 'Rule out secondary causes, provide symptomatic treatment, assess for red flags',
+					type: 'assessment',
+					resource: 'ClinicalImpression'
+				},
+				trigger: 'headache-complaint',
+				strength: 'strong',
+				evidence: 'Clinical best practice',
+				resourceConstraints: ['basic-clinical-assessment']
+			},
+			{
+				id: 'gm-03',
+				title: 'Visual Disturbances Assessment',
+				condition: {
+					code: 'H53.9', // Visual disturbance, unspecified
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['visual disturbances', 'blurred vision', 'vision problems']
+				},
+				action: {
+					title: 'Vision Assessment',
+					description: 'Check visual acuity, assess for urgent causes, refer if neurological signs',
+					type: 'assessment',
+					resource: 'ClinicalImpression'
+				},
+				trigger: 'vision-complaint',
+				strength: 'strong',
+				evidence: 'Clinical guidelines',
+				resourceConstraints: ['basic-eye-examination']
+			},
+			{
+				id: 'gm-04',
+				title: 'Blood Pressure Assessment',
+				condition: {
+					code: 'R03.0', // Elevated blood pressure reading
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['blood pressure', 'bp', 'hypertension']
+				},
+				action: {
+					title: 'Blood Pressure Evaluation',
+					description: 'Repeat BP measurement, assess cardiovascular risk, lifestyle counseling',
+					type: 'assessment',
+					resource: 'Observation'
+				},
+				trigger: 'bp-complaint',
+				strength: 'strong',
+				evidence: 'WHO guidelines',
+				resourceConstraints: ['bp-monitor', 'cardiovascular-assessment']
+			},
+			{
+				id: 'gm-05',
+				title: 'Abdominal Pain Assessment',
+				condition: {
+					code: 'R10.9', // Abdominal pain, unspecified
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['abdominal pain', 'stomach pain', 'epigastric pain']
+				},
+				action: {
+					title: 'Abdominal Pain Evaluation',
+					description: 'Systematic examination, assess for surgical conditions, provide supportive care',
+					type: 'assessment',
+					resource: 'ClinicalImpression'
+				},
+				trigger: 'abdominal-pain-complaint',
+				strength: 'strong',
+				evidence: 'Clinical guidelines',
+				resourceConstraints: ['clinical-examination']
+			},
+			{
+				id: 'gm-06',
+				title: 'General Clinical Assessment',
+				condition: {
+					code: 'Z00.00', // General adult medical examination
+					system: 'http://hl7.org/fhir/sid/icd-10'
+				},
+				criteria: {
+					symptoms: ['general', 'consultation', 'check-up']
+				},
+				action: {
+					title: 'Comprehensive Assessment',
+					description: 'Complete history and examination, vital signs, basic investigations as indicated',
+					type: 'assessment',
+					resource: 'ClinicalImpression'
+				},
+				trigger: 'general-consultation',
+				strength: 'moderate',
+				evidence: 'Clinical practice standards',
+				resourceConstraints: ['basic-clinical-assessment']
 			}
 		]
 	}
@@ -218,6 +401,34 @@ export const CQL_RULES = {
         and "Has Cough"
         and "Fast Breathing"
         and not "Danger Signs Present"
+  `,
+
+	// Add general medicine CQL rules
+	generalMedicineRules: `
+    library GeneralMedicineGuidelines version '1.0.0'
+    
+    using FHIR version '4.0.1'
+    
+    define "Adult Patient":
+      [Patient] P
+        where AgeInYears() >= 18
+    
+    define "Has Fever":
+      exists([Observation: "Body Temperature"] T 
+        where T.value > 38.0 and T.status = 'final')
+    
+    define "Has Headache":
+      exists([Condition: "Headache"] H 
+        where H.clinicalStatus = 'active')
+    
+    define "Elevated Blood Pressure":
+      exists([Observation: "Blood Pressure"] BP
+        where (BP.component[0].value > 140 or BP.component[1].value > 90)
+          and BP.status = 'final')
+    
+    define "General Assessment Needed":
+      "Adult Patient"
+        and ("Has Fever" or "Has Headache" or "Elevated Blood Pressure")
   `
 };
 
@@ -278,18 +489,57 @@ export class SMARTGuidelinesEngine {
 			}
 
 			if (condition.code === 'J18.9') {
-				const symptoms = (patientData.symptoms || '').toLowerCase();
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
 				return symptoms.includes('cough') && (symptoms.includes('fever') || symptoms.includes('breathing'));
 			}
 
 			if (condition.code === 'K59.1') {
-				const symptoms = (patientData.symptoms || '').toLowerCase();
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
 				return symptoms.includes('diarrhea') || symptoms.includes('diarrhoea');
 			}
 
+			if (condition.code === 'O14.9') { // Preeclampsia
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+
+				const hasHeadache = symptoms.includes('headache');
+				const hasVisual = symptoms.includes('visual');
+				const hasEpigastric = symptoms.includes('epigastric');
+
+				// Check blood pressure
+				const vitals = patientData.vitalSigns || patientData.vitals || {};
+				const bpString = vitals.bp || '';
+				const bpMatch = bpString.match ? bpString.match(/(\d+)\/(\d+)/) : null;
+
+				let highBP = false;
+				if (bpMatch) {
+					const systolic = parseInt(bpMatch[1]);
+					const diastolic = parseInt(bpMatch[2]);
+					highBP = systolic >= 140 || diastolic >= 90;
+				}
+
+				// Preeclampsia if severe symptoms + high BP
+				return (hasHeadache && hasVisual) || (hasEpigastric && highBP);
+			}
+
+			// ADD THIS: Malaria condition matching
+			if (condition.code === 'B54') { // Malaria
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+				const hasRDT = patientData.examination?.rdt === 'positive';
+				const hasFever = symptoms.includes('fever');
+				return hasFever && hasRDT;
+			}
+
 			if (condition.code === 'I10') {
-				const vitals = patientData.vitals || '';
-				const bpMatch = vitals.match(/(\d+)\/(\d+)/);
+				const vitals = patientData.vitals || patientData.vitalSigns || '';
+				const bpMatch = vitals.match ? vitals.match(/(\d+)\/(\d+)/) : null;
 				if (bpMatch) {
 					const systolic = parseInt(bpMatch[1]);
 					const diastolic = parseInt(bpMatch[2]);
@@ -297,22 +547,54 @@ export class SMARTGuidelinesEngine {
 				}
 			}
 
-			// Age-based criteria evaluation
-			if (criteria?.ageRange) {
-				const age = patientData.age;
-				if (!age) return false;
+			// Enhanced general medicine conditions
+			if (condition.code === 'R50.9') { // Fever
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+				return symptoms.includes('fever') || symptoms.includes('temperature');
+			}
 
-				if (criteria.ageRange.unit === 'months') {
-					const ageInMonths = age * 12; // Assuming age is in years, convert to months
-					return ageInMonths >= criteria.ageRange.min && ageInMonths <= criteria.ageRange.max;
-				} else {
-					return age >= criteria.ageRange.min && age <= criteria.ageRange.max;
-				}
+			if (condition.code === 'R51') { // Headache
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+				return symptoms.includes('headache') || symptoms.includes('head pain');
+			}
+
+			if (condition.code === 'H53.9') { // Visual disturbances
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+				return symptoms.includes('visual') || symptoms.includes('vision') || symptoms.includes('blurred');
+			}
+
+			if (condition.code === 'R10.9') { // Abdominal pain
+				const symptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+				return symptoms.includes('abdominal') || symptoms.includes('stomach') || symptoms.includes('epigastric');
+			}
+
+			// Generic symptom matching with proper type handling
+			if (criteria && criteria.symptoms) {
+				const patientSymptoms = Array.isArray(patientData.symptoms)
+					? patientData.symptoms.join(' ').toLowerCase()
+					: (patientData.symptoms || '').toLowerCase();
+
+				const criteriaSymptoms = Array.isArray(criteria.symptoms)
+					? criteria.symptoms
+					: [criteria.symptoms];
+
+				return criteriaSymptoms.some(symptom =>
+					patientSymptoms.includes(symptom.toLowerCase())
+				);
 			}
 
 			return false;
 		} catch (error) {
 			console.error('Error evaluating condition:', error);
+			console.error('Patient data type:', typeof patientData.symptoms, patientData.symptoms);
 			return false;
 		}
 	}
@@ -324,7 +606,14 @@ export class SMARTGuidelinesEngine {
 			'anc-02': 'Moderate quality evidence (WHO Strong Recommendation)',
 			'imci-pneumonia': 'High quality evidence (WHO Strong Recommendation)',
 			'imci-diarrhea': 'High quality evidence (WHO Strong Recommendation)',
-			'pen-hypertension': 'High quality evidence (WHO Strong Recommendation)'
+			'pen-hypertension': 'High quality evidence (WHO Strong Recommendation)',
+			// Add general medicine evidence levels
+			'gm-01': 'WHO Clinical Guidelines (Strong Recommendation)',
+			'gm-02': 'Clinical best practice (Moderate Recommendation)',
+			'gm-03': 'Clinical guidelines (Strong Recommendation)',
+			'gm-04': 'WHO guidelines (Strong Recommendation)',
+			'gm-05': 'Clinical guidelines (Strong Recommendation)',
+			'gm-06': 'Clinical practice standards (Moderate Recommendation)'
 		};
 
 		return evidenceLevels[recommendationId] || 'Moderate quality evidence';
@@ -335,7 +624,8 @@ export class SMARTGuidelinesEngine {
 		const resourceMap = {
 			'MedicationRequest': ['pharmacy', 'medication-availability'],
 			'Immunization': ['vaccine-cold-chain', 'trained-staff'],
-			'Observation': ['basic-equipment']
+			'Observation': ['basic-equipment'],
+			'ClinicalImpression': ['trained-healthcare-provider']
 		};
 
 		return resourceMap[action.resource] || ['basic-infrastructure'];

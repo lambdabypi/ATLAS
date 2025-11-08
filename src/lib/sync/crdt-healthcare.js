@@ -1,4 +1,4 @@
-// lib/sync/crdt-healthcare.js
+// lib/sync/crdt-healthcare.js - FIXED VERSION with missing getDocument method
 /**
  * Healthcare-specific CRDT implementation for ATLAS
  * Provides conflict-free replication for patient and consultation data
@@ -373,6 +373,34 @@ export class HealthcareCRDTManager {
 		return crdt;
 	}
 
+	// MISSING METHOD FIX: Get document by ID
+	getDocument(id) {
+		return this.documents.get(id) || null;
+	}
+
+	// Check if document exists
+	hasDocument(id) {
+		return this.documents.has(id);
+	}
+
+	// Delete document
+	deleteDocument(id) {
+		const crdt = this.documents.get(id);
+		if (crdt) {
+			this.documents.delete(id);
+
+			// Queue for sync
+			this.syncQueue.push({
+				action: 'delete',
+				documentId: id,
+				timestamp: new Date().toISOString()
+			});
+
+			return true;
+		}
+		return false;
+	}
+
 	// Update document
 	updateDocument(id, path, value, metadata = {}) {
 		const crdt = this.documents.get(id);
@@ -391,6 +419,12 @@ export class HealthcareCRDTManager {
 		});
 
 		return operation;
+	}
+
+	// Get document state (convenience method)
+	getDocumentState(id) {
+		const crdt = this.documents.get(id);
+		return crdt ? crdt.state : null;
 	}
 
 	// Merge remote document
@@ -433,7 +467,11 @@ export class HealthcareCRDTManager {
 		const docs = [];
 		for (const crdt of this.documents.values()) {
 			if (crdt.type === type) {
-				docs.push(crdt.state);
+				docs.push({
+					id: crdt.id,
+					state: crdt.state,
+					metadata: crdt.metadata
+				});
 			}
 		}
 		return docs;
@@ -453,6 +491,27 @@ export class HealthcareCRDTManager {
 	// Clear sync queue after successful sync
 	clearSyncQueue() {
 		this.syncQueue = [];
+	}
+
+	// Get all document IDs
+	getAllDocumentIds() {
+		return Array.from(this.documents.keys());
+	}
+
+	// Get documents by patient ID (convenience method for healthcare)
+	getPatientDocuments(patientId) {
+		const docs = [];
+		for (const crdt of this.documents.values()) {
+			if (crdt.state.patientId === patientId) {
+				docs.push({
+					id: crdt.id,
+					type: crdt.type,
+					state: crdt.state,
+					metadata: crdt.metadata
+				});
+			}
+		}
+		return docs;
 	}
 }
 

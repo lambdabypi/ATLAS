@@ -1,21 +1,18 @@
 // src/app/layout.js
-// No 'use client' directive here since we're using metadata export
-
 import { Inter } from 'next/font/google';
-import './globals.css'; // Keep global CSS file for basic styles
+import './globals.css';
 import AppShell from '../components/layout/AppShell';
+import '../styles/components.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// Metadata must be in a server component (not marked with 'use client')
 export const metadata = {
 	title: 'Clinical Decision Support System',
 	description: 'LLM-powered clinical decision support for resource-limited settings',
 };
 
-// Viewport configuration - move themeColor here to fix warning
 export const viewport = {
-	themeColor: '#2563eb',
+	themeColor: '#667eea',
 };
 
 export default function RootLayout({ children }) {
@@ -31,12 +28,10 @@ export default function RootLayout({ children }) {
 				<link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
 				<link rel="manifest" href="/manifest.json" />
 			</head>
-			<body className={inter.className}>
-				<div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-					<AppShell>
-						{children}
-					</AppShell>
-				</div>
+			<body className={`${inter.className} m-0 p-0`}>
+				<AppShell>
+					{children}
+				</AppShell>
 			</body>
 		</html>
 	);

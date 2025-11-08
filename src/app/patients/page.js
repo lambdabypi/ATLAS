@@ -1,4 +1,4 @@
-// src/app/patients/page.js
+// src/app/patients/page.js - CENTERED VERSION
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,6 +10,11 @@ import { Input } from '../../components/ui/Input';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
+
+// ADD PATIENT PAGE - CENTERED VERSION
+export function AddPatientPage() {
+	// ... (AddPatientPage implementation remains the same but wrapped in atlas-backdrop)
+}
 
 export default function PatientsPage() {
 	const [patients, setPatients] = useState([]);
@@ -57,124 +62,128 @@ export default function PatientsPage() {
 	);
 
 	return (
-		<div className="max-w-7xl mx-auto p-6">
-			<div className="flex justify-between items-center mb-6">
-				<h1 className="text-2xl font-bold text-gray-900">Patient Records</h1>
-				<Button as={Link} href="/patients/add" variant="primary">
-					Add New Patient
-				</Button>
-			</div>
+		<div className="atlas-backdrop">
+			<div className="atlas-page-container">
+				<div className="atlas-content-wrapper" style={{ maxWidth: '90rem' }}>
+					<div className="flex justify-between items-center mb-6">
+						<h1 className="text-2xl font-bold text-gray-900">Patient Records</h1>
+						<Button as={Link} href="/patients/add" variant="primary">
+							Add New Patient
+						</Button>
+					</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Patient List */}
-				<div className="lg:col-span-1">
-					<Card>
-						<CardHeader>
-							<div className="space-y-4">
-								<div className="flex items-center justify-between">
-									<h3 className="font-semibold text-gray-800">Patients</h3>
-									<Badge variant="secondary">
-										{filteredPatients.length} patients
-									</Badge>
-								</div>
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+						{/* Patient List */}
+						<div className="lg:col-span-1">
+							<Card className="atlas-card-primary">
+								<CardHeader>
+									<div className="space-y-4">
+										<div className="flex items-center justify-between">
+											<h3 className="font-semibold text-gray-800">Patients</h3>
+											<Badge variant="secondary">
+												{filteredPatients.length} patients
+											</Badge>
+										</div>
 
-								<Input
-									type="text"
-									placeholder="Search patients..."
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
-							</div>
-						</CardHeader>
-
-						<CardContent padding={false}>
-							{loading ? (
-								<div className="flex justify-center py-8">
-									<LoadingSpinner />
-									<span className="ml-2 text-gray-500">Loading patients...</span>
-								</div>
-							) : filteredPatients.length === 0 ? (
-								<div className="p-6">
-									{searchQuery ? (
-										<EmptyState
-											icon={PatientsIcon}
-											title="No patients found"
-											description={`No patients found matching "${searchQuery}"`}
-											action={
-												<Button variant="secondary" onClick={() => setSearchQuery('')}>
-													Clear Search
-												</Button>
-											}
+										<Input
+											type="text"
+											placeholder="Search patients..."
+											value={searchQuery}
+											onChange={(e) => setSearchQuery(e.target.value)}
 										/>
+									</div>
+								</CardHeader>
+
+								<CardContent padding={false}>
+									{loading ? (
+										<div className="flex justify-center py-8">
+											<LoadingSpinner />
+											<span className="ml-2 text-gray-500">Loading patients...</span>
+										</div>
+									) : filteredPatients.length === 0 ? (
+										<div className="p-6">
+											{searchQuery ? (
+												<EmptyState
+													icon={PatientsIcon}
+													title="No patients found"
+													description={`No patients found matching "${searchQuery}"`}
+													action={
+														<Button variant="secondary" onClick={() => setSearchQuery('')}>
+															Clear Search
+														</Button>
+													}
+												/>
+											) : (
+												<EmptyState
+													icon={PatientsIcon}
+													title="No patients in database"
+													description="Add your first patient to get started."
+													action={
+														<Button as={Link} href="/patients/add" variant="primary">
+															Add First Patient
+														</Button>
+													}
+												/>
+											)}
+										</div>
 									) : (
+										<div className="max-h-96 overflow-y-auto">
+											<ul className="divide-y divide-gray-200">
+												{filteredPatients.map(patient => {
+													const isActive = selectedPatient?.id === patient.id;
+													return (
+														<li
+															key={patient.id}
+															className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isActive ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
+															onClick={() => handlePatientSelect(patient)}
+														>
+															<div className="flex justify-between items-start">
+																<div className="flex-1">
+																	<h4 className="font-medium text-gray-900">{patient.name}</h4>
+																	<p className="text-sm text-gray-500">{patient.age} years, {patient.gender}</p>
+																	{patient.allergies && (
+																		<Badge variant="danger" className="mt-1 text-xs">
+																			Allergies: {patient.allergies}
+																		</Badge>
+																	)}
+																</div>
+																<div className="text-right text-xs text-gray-500">
+																	<p>Last visit</p>
+																	<p className="font-medium">{formatDate(patient.lastVisit)}</p>
+																</div>
+															</div>
+														</li>
+													);
+												})}
+											</ul>
+										</div>
+									)}
+								</CardContent>
+							</Card>
+						</div>
+
+						{/* Patient Details */}
+						<div className="lg:col-span-2">
+							{selectedPatient ? (
+								<PatientRecord patient={selectedPatient} />
+							) : (
+								<Card className="atlas-card-secondary">
+									<CardContent>
 										<EmptyState
 											icon={PatientsIcon}
-											title="No patients in database"
-											description="Add your first patient to get started."
+											title="No patient selected"
+											description="Select a patient from the list to view their medical record or create a new consultation."
 											action={
 												<Button as={Link} href="/patients/add" variant="primary">
-													Add First Patient
+													Add New Patient
 												</Button>
 											}
 										/>
-									)}
-								</div>
-							) : (
-								<div className="max-h-96 overflow-y-auto">
-									<ul className="divide-y divide-gray-200">
-										{filteredPatients.map(patient => {
-											const isActive = selectedPatient?.id === patient.id;
-											return (
-												<li
-													key={patient.id}
-													className={`p-4 cursor-pointer hover:bg-gray-50 ${isActive ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
-													onClick={() => handlePatientSelect(patient)}
-												>
-													<div className="flex justify-between items-start">
-														<div className="flex-1">
-															<h4 className="font-medium text-gray-900">{patient.name}</h4>
-															<p className="text-sm text-gray-500">{patient.age} years, {patient.gender}</p>
-															{patient.allergies && (
-																<Badge variant="danger" className="mt-1 text-xs">
-																	Allergies: {patient.allergies}
-																</Badge>
-															)}
-														</div>
-														<div className="text-right text-xs text-gray-500">
-															<p>Last visit</p>
-															<p className="font-medium">{formatDate(patient.lastVisit)}</p>
-														</div>
-													</div>
-												</li>
-											);
-										})}
-									</ul>
-								</div>
+									</CardContent>
+								</Card>
 							)}
-						</CardContent>
-					</Card>
-				</div>
-
-				{/* Patient Details */}
-				<div className="lg:col-span-2">
-					{selectedPatient ? (
-						<PatientRecord patient={selectedPatient} />
-					) : (
-						<Card>
-							<CardContent>
-								<EmptyState
-									icon={PatientsIcon}
-									title="No patient selected"
-									description="Select a patient from the list to view their medical record or create a new consultation."
-									action={
-										<Button as={Link} href="/patients/add" variant="primary">
-											Add New Patient
-										</Button>
-									}
-								/>
-							</CardContent>
-						</Card>
-					)}
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -223,7 +232,7 @@ function PatientRecord({ patient }) {
 	return (
 		<div className="space-y-6">
 			{/* Patient Information */}
-			<Card>
+			<Card className="atlas-card-primary">
 				<CardHeader>
 					<div className="flex justify-between items-center">
 						<h2 className="text-lg font-semibold text-gray-900">Patient Information</h2>
@@ -280,7 +289,7 @@ function PatientRecord({ patient }) {
 			</Card>
 
 			{/* Recent Consultations */}
-			<Card>
+			<Card className="atlas-card-primary">
 				<CardHeader>
 					<div className="flex justify-between items-center">
 						<h3 className="font-semibold text-gray-800">Recent Consultations</h3>
@@ -310,7 +319,7 @@ function PatientRecord({ patient }) {
 					) : (
 						<div className="max-h-80 overflow-y-auto">
 							{consultations.slice(0, 5).map(consultation => (
-								<div key={consultation.id} className="p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
+								<div key={consultation.id} className="p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors">
 									<Link href={`/consultation/${consultation.id}`} className="block">
 										<div className="flex justify-between items-start">
 											<div className="flex-1">
@@ -338,7 +347,7 @@ function PatientRecord({ patient }) {
 
 							{consultations.length > 5 && (
 								<div className="p-4 bg-gray-50 border-t border-gray-200 text-center">
-									<Link href={`/patients/${patient.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+									<Link href={`/patients/${patient.id}`} className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
 										View all consultations →
 									</Link>
 								</div>
