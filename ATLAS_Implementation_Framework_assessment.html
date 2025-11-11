@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ATLAS Implementation Framework Assessment</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			line-height: 1.6;
+			margin: 0;
+			padding: 20px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+
+		.container {
+			max-width: 1200px;
+			margin: 0 auto;
+			background: rgba(255, 255, 255, 0.95);
+			backdrop-filter: blur(10px);
+			border-radius: 20px;
+			padding: 30px;
+			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+		}
+
+		.framework-nav {
+			display: flex;
+			justify-content: center;
+			margin-bottom: 30px;
+			gap: 10px;
+		}
+
+		.nav-btn {
+			padding: 12px 24px;
+			background: rgba(102, 126, 234, 0.1);
+			border: 2px solid #667eea;
+			border-radius: 25px;
+			cursor: pointer;
+			transition: all 0.3s;
+		}
+
+		.nav-btn.active {
+			background: #667eea;
+			color: white;
+		}
+
+		.framework-section {
+			display: none;
+			padding: 25px;
+			background: rgba(255, 255, 255, 0.8);
+			border-radius: 15px;
+			margin: 20px 0;
+		}
+
+		.framework-section.active {
+			display: block;
+		}
+
+		.domain-card {
+			border: 2px solid #e2e8f0;
+			border-radius: 12px;
+			padding: 20px;
+			margin: 15px 0;
+			background: #fafafa;
+		}
+
+		.domain-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 15px;
+		}
+
+		.domain-title {
+			font-weight: bold;
+			color: #2d3748;
+			font-size: 18px;
+		}
+
+		.complexity-indicator {
+			padding: 8px 16px;
+			border-radius: 20px;
+			font-weight: bold;
+			font-size: 14px;
+		}
+
+		.simple {
+			background: #c6f6d5;
+			color: #22543d;
+		}
+
+		.complicated {
+			background: #fed7d7;
+			color: #742a2a;
+		}
+
+		.complex {
+			background: #ffeaa7;
+			color: #744210;
+		}
+
+		.chaotic {
+			background: #fbb6ce;
+			color: #702459;
+		}
+
+		.assessment-grid {
+			display: grid;
+			grid-template-columns: 1fr 2fr 1fr;
+			gap: 15px;
+			align-items: center;
+			margin: 15px 0;
+		}
+
+		.metric-card {
+			background: white;
+			padding: 20px;
+			border-radius: 10px;
+			text-align: center;
+			border: 2px solid #e2e8f0;
+		}
+
+		.metric-value {
+			font-size: 28px;
+			font-weight: bold;
+			color: #667eea;
+		}
+
+		.metric-label {
+			color: #718096;
+			font-size: 14px;
+			margin-top: 5px;
+		}
+
+		.scoring-table {
+			width: 100%;
+			border-collapse: collapse;
+			margin: 20px 0;
+		}
+
+		.scoring-table th,
+		.scoring-table td {
+			padding: 12px;
+			text-align: left;
+			border-bottom: 1px solid #e2e8f0;
+		}
+
+		.scoring-table th {
+			background: #f7fafc;
+			font-weight: 600;
+		}
+
+		.score-input {
+			width: 80px;
+			padding: 8px;
+			border: 2px solid #e2e8f0;
+			border-radius: 6px;
+			text-align: center;
+		}
+
+		.recommendations-box {
+			background: #e6fffa;
+			border-left: 4px solid #38b2ac;
+			padding: 20px;
+			margin: 20px 0;
+			border-radius: 8px;
+		}
+
+		.export-buttons {
+			display: flex;
+			gap: 15px;
+			justify-content: center;
+			margin-top: 30px;
+		}
+
+		.export-btn {
+			padding: 12px 24px;
+			border: none;
+			border-radius: 8px;
+			cursor: pointer;
+			font-weight: 600;
+			transition: transform 0.2s;
+		}
+
+		.export-btn:hover {
+			transform: translateY(-2px);
+		}
+
+		.btn-primary {
+			background: #667eea;
+			color: white;
+		}
+
+		.btn-secondary {
+			background: #38b2ac;
+			color: white;
+		}
+
+		.btn-accent {
+			background: #ed8936;
+			color: white;
+		}
+
+		.readiness-dashboard {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: white;
+			padding: 30px;
+			border-radius: 15px;
+			margin: 30px 0;
+			text-align: center;
+		}
+
+		.readiness-score {
+			font-size: 48px;
+			font-weight: bold;
+			margin: 20px 0;
+		}
+
+		.readiness-status {
+			font-size: 24px;
+			margin: 10px 0;
+		}
+
+		.progress-bars {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 20px;
+			margin-top: 20px;
+		}
+
+		.progress-item {
+			text-align: center;
+		}
+
+		.progress-bar {
+			width: 100%;
+			height: 8px;
+			background: rgba(255, 255, 255, 0.3);
+			border-radius: 4px;
+			overflow: hidden;
+			margin: 10px 0;
+		}
+
+		.progress-fill {
+			height: 100%;
+			background: white;
+			transition: width 0.5s ease;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>ATLAS Implementation Framework Assessment</h1>
+		<p style="color: #718096; margin-bottom: 30px;">
+			Comprehensive evaluation using NASSS, RE-AIM, and WHO MAPS frameworks
+		</p>
+
+		<!-- Readiness Dashboard -->
+		<div class="readiness-dashboard">
+			<h3>Implementation Readiness Score</h3>
+			<div class="readiness-score" id="overallScore">--/100</div>
+			<div class="readiness-status" id="readinessStatus">Assessment in Progress</div>
+			<div class="progress-bars">
+				<div class="progress-item">
+					<div>NASSS</div>
+					<div class="progress-bar">
+						<div class="progress-fill" id="nasssProgress"></div>
+					</div>
+					<div id="nasssScore">--%</div>
+				</div>
+				<div class="progress-item">
+					<div>RE-AIM</div>
+					<div class="progress-bar">
+						<div class="progress-fill" id="reaimProgress"></div>
+					</div>
+					<div id="reaimScore">--%</div>
+				</div>
+				<div class="progress-item">
+					<div>WHO MAPS</div>
+					<div class="progress-bar">
+						<div class="progress-fill" id="mapsProgress"></div>
+					</div>
+					<div id="mapsScore">--%</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Framework Navigation -->
+		<div class="framework-nav">
+			<div class="nav-btn active" onclick="showFramework('nasss')">NASSS Framework</div>
+			<div class="nav-btn" onclick="showFramework('reaim')">RE-AIM Framework</div>
+			<div class="nav-btn" onclick="showFramework('whomaps')">WHO MAPS</div>
+			<div class="nav-btn" onclick="showFramework('summary')">Assessment Summary</div>
+		</div>
+
+		<!-- NASSS Framework Assessment -->
+		<div id="nasss" class="framework-section active">
+			<h2>NASSS Framework Assessment</h2>
+			<p>Evaluate complexity across seven domains to predict implementation success</p>
+
+			<div class="domain-card">
+				<div class="domain-header">
+					<div class="domain-title">Domain 1: Technology</div>
+					<div class="complexity-indicator simple" id="tech_complexity">Simple</div>
+				</div>
+				<table class="scoring-table">
+					<tr>
+						<th>Criteria</th>
+						<th>Assessment</th>
+						<th>Score (1-5)</th>
+					</tr>
+					<tr>
+						<td>Reliability & Accuracy</td>
+						<td>System performs consistently with high accuracy in clinical scenarios</td>
+						<td><input type="number" class="score-input" name="tech_reliability" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Offline Capability</td>
+						<td>Functions completely without internet connectivity</td>
+						<td><input type="number" class="score-input" name="tech_offline" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Security & Privacy</td>
+						<td>Meets healthcare data protection requirements</td>
+						<td><input type="number" class="score-input" name="tech_security" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Usability</td>
+						<td>Intuitive interface requiring minimal training</td>
+						<td><input type="number" class="score-input" name="tech_usability" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<div class="domain-header">
+					<div class="domain-title">Domain 2: Value Proposition</div>
+					<div class="complexity-indicator simple" id="value_complexity">Simple</div>
+				</div>
+				<table class="scoring-table">
+					<tr>
+						<th>Criteria</th>
+						<th>Assessment</th>
+						<th>Score (1-5)</th>
+					</tr>
+					<tr>
+						<td>Clinical Impact</td>
+						<td>Demonstrable improvement in diagnostic accuracy and care quality</td>
+						<td><input type="number" class="score-input" name="value_clinical" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Cost-Effectiveness</td>
+						<td>Low implementation costs relative to expected benefits</td>
+						<td><input type="number" class="score-input" name="value_cost" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Time Efficiency</td>
+						<td>Reduces consultation time while improving outcomes</td>
+						<td><input type="number" class="score-input" name="value_time" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<div class="domain-header">
+					<div class="domain-title">Domain 3: Adopters</div>
+					<div class="complexity-indicator complicated" id="adopters_complexity">Complicated</div>
+				</div>
+				<table class="scoring-table">
+					<tr>
+						<td>Digital Literacy</td>
+						<td>Healthcare worker comfort with technology</td>
+						<td><input type="number" class="score-input" name="adopters_literacy" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Workflow Integration</td>
+						<td>Fits naturally into existing clinical processes</td>
+						<td><input type="number" class="score-input" name="adopters_workflow" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+					<tr>
+						<td>Training Requirements</td>
+						<td>Minimal training needed for effective use</td>
+						<td><input type="number" class="score-input" name="adopters_training" min="1" max="5"
+								onchange="calculateNASSS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<!-- Continue with remaining NASSS domains... -->
+			<div class="recommendations-box">
+				<h4>NASSS Recommendations</h4>
+				<ul id="nasss_recommendations">
+					<li>Complete assessment to see specific recommendations</li>
+				</ul>
+			</div>
+		</div>
+
+		<!-- RE-AIM Framework Assessment -->
+		<div id="reaim" class="framework-section">
+			<h2>RE-AIM Framework Assessment</h2>
+			<p>Evaluate real-world implementation potential across five dimensions</p>
+
+			<div class="assessment-grid">
+				<div class="metric-card">
+					<div class="metric-value" id="reach_score">--%</div>
+					<div class="metric-label">REACH</div>
+				</div>
+				<div class="metric-card">
+					<div class="metric-value" id="effectiveness_score">--%</div>
+					<div class="metric-label">EFFECTIVENESS</div>
+				</div>
+				<div class="metric-card">
+					<div class="metric-value" id="adoption_score">--%</div>
+					<div class="metric-label">ADOPTION</div>
+				</div>
+			</div>
+
+			<div class="domain-card">
+				<h3>Reach Assessment</h3>
+				<table class="scoring-table">
+					<tr>
+						<th>Metric</th>
+						<th>Target Value</th>
+						<th>Current Assessment</th>
+						<th>Score</th>
+					</tr>
+					<tr>
+						<td>Target Population Coverage</td>
+						<td>% of eligible facilities</td>
+						<td><input type="number" class="score-input" name="reach_coverage" placeholder="%"
+								onchange="calculateREAIM()"></td>
+						<td id="reach_coverage_score">--</td>
+					</tr>
+					<tr>
+						<td>Geographic Representativeness</td>
+						<td>Urban + Rural deployment</td>
+						<td>
+							<select name="reach_geographic" onchange="calculateREAIM()">
+								<option value="">Select</option>
+								<option value="5">Both urban and rural</option>
+								<option value="3">Primarily urban</option>
+								<option value="3">Primarily rural</option>
+								<option value="1">Single location type</option>
+							</select>
+						</td>
+						<td id="reach_geographic_score">--</td>
+					</tr>
+					<tr>
+						<td>Healthcare Worker Participation</td>
+						<td>% willing to use system</td>
+						<td><input type="number" class="score-input" name="reach_participation" placeholder="%"
+								onchange="calculateREAIM()"></td>
+						<td id="reach_participation_score">--</td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<h3>Effectiveness Assessment</h3>
+				<table class="scoring-table">
+					<tr>
+						<td>Diagnostic Accuracy</td>
+						<td><input type="number" class="score-input" name="effectiveness_accuracy" placeholder="%"
+								onchange="calculateREAIM()"></td>
+						<td id="effectiveness_accuracy_score">--</td>
+					</tr>
+					<tr>
+						<td>Clinical Outcome Improvement</td>
+						<td>
+							<select name="effectiveness_outcomes" onchange="calculateREAIM()">
+								<option value="">Select improvement level</option>
+								<option value="5">Significant (>20%)</option>
+								<option value="4">Moderate (10-20%)</option>
+								<option value="3">Minimal (5-10%)</option>
+								<option value="2">Marginal (<5%)< /option>
+								<option value="1">No improvement</option>
+							</select>
+						</td>
+						<td id="effectiveness_outcomes_score">--</td>
+					</tr>
+					<tr>
+						<td>User Satisfaction</td>
+						<td><input type="number" class="score-input" name="effectiveness_satisfaction" placeholder="1-5"
+								min="1" max="5" onchange="calculateREAIM()"></td>
+						<td id="effectiveness_satisfaction_score">--</td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<h3>Adoption Assessment</h3>
+				<table class="scoring-table">
+					<tr>
+						<td>Organizational Readiness</td>
+						<td>
+							<select name="adoption_readiness" onchange="calculateREAIM()">
+								<option value="">Select readiness level</option>
+								<option value="5">Highly ready</option>
+								<option value="4">Moderately ready</option>
+								<option value="3">Somewhat ready</option>
+								<option value="2">Limited readiness</option>
+								<option value="1">Not ready</option>
+							</select>
+						</td>
+						<td id="adoption_readiness_score">--</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+
+		<!-- WHO MAPS Assessment -->
+		<div id="whomaps" class="framework-section">
+			<h2>WHO MAPS Assessment</h2>
+			<p>Evaluate mHealth scale readiness across six dimensions</p>
+
+			<div class="domain-card">
+				<h3>1. Groundwork</h3>
+				<table class="scoring-table">
+					<tr>
+						<th>Component</th>
+						<th>Status</th>
+						<th>Score (1-4)</th>
+					</tr>
+					<tr>
+						<td>Evidence Base</td>
+						<td>Strong clinical validation with WHO guidelines</td>
+						<td><input type="number" class="score-input" name="maps_evidence" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Strategic Alignment</td>
+						<td>Aligns with national health priorities</td>
+						<td><input type="number" class="score-input" name="maps_strategic" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>User Engagement</td>
+						<td>Healthcare worker involvement in design</td>
+						<td><input type="number" class="score-input" name="maps_engagement" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<h3>2. Partnerships</h3>
+				<table class="scoring-table">
+					<tr>
+						<td>Government Partnership</td>
+						<td><input type="number" class="score-input" name="maps_government" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Private Sector Engagement</td>
+						<td><input type="number" class="score-input" name="maps_private" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Academic Collaboration</td>
+						<td><input type="number" class="score-input" name="maps_academic" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<h3>3. Financial Health</h3>
+				<table class="scoring-table">
+					<tr>
+						<td>Sustainable Funding Model</td>
+						<td><input type="number" class="score-input" name="maps_funding" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Cost-Effectiveness</td>
+						<td><input type="number" class="score-input" name="maps_cost_effective" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="domain-card">
+				<h3>4. Technology</h3>
+				<table class="scoring-table">
+					<tr>
+						<td>Technical Robustness</td>
+						<td><input type="number" class="score-input" name="maps_robust" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Scalability</td>
+						<td><input type="number" class="score-input" name="maps_scalability" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+					<tr>
+						<td>Interoperability</td>
+						<td><input type="number" class="score-input" name="maps_interop" min="1" max="4"
+								onchange="calculateMAPS()"></td>
+					</tr>
+				</table>
+			</div>
+		</div>
+
+		<!-- Assessment Summary -->
+		<div id="summary" class="framework-section">
+			<h2>Implementation Assessment Summary</h2>
+
+			<div class="assessment-grid">
+				<div class="metric-card">
+					<div class="metric-value" id="summary_nasss">--%</div>
+					<div class="metric-label">NASSS Complexity</div>
+				</div>
+				<div class="metric-card">
+					<div class="metric-value" id="summary_reaim">--%</div>
+					<div class="metric-label">RE-AIM Potential</div>
+				</div>
+				<div class="metric-card">
+					<div class="metric-value" id="summary_maps">--%</div>
+					<div class="metric-label">WHO MAPS Readiness</div>
+				</div>
+			</div>
+
+			<div class="recommendations-box">
+				<h4>Implementation Recommendations</h4>
+				<div id="implementation_recommendations">
+					<p>Complete all framework assessments to generate specific recommendations.</p>
+				</div>
+			</div>
+
+			<div class="recommendations-box" style="background: #fff5f5; border-color: #fc8181;">
+				<h4>Risk Factors & Mitigation</h4>
+				<div id="risk_analysis">
+					<p>Risk analysis will appear after assessment completion.</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Export Buttons -->
+		<div class="export-buttons">
+			<button class="export-btn btn-primary" onclick="exportAssessment()">Export Complete Assessment</button>
+			<button class="export-btn btn-secondary" onclick="generateImplementationPlan()">Generate Implementation
+				Plan</button>
+			<button class="export-btn btn-accent" onclick="createExecutiveSummary()">Create Executive Summary</button>
+		</div>
+	</div>
+
+	<script>
+		let assessmentData = {
+			nasss: {},
+			reaim: {},
+			whomaps: {},
+			summary: {},
+			timestamp: new Date().toISOString()
+		};
+
+		function showFramework(framework) {
+			// Hide all sections
+			document.querySelectorAll('.framework-section').forEach(section => {
+				section.classList.remove('active');
+			});
+
+			// Hide all nav buttons
+			document.querySelectorAll('.nav-btn').forEach(btn => {
+				btn.classList.remove('active');
+			});
+
+			// Show selected section and activate button
+			document.getElementById(framework).classList.add('active');
+			event.target.classList.add('active');
+		}
+
+		function calculateNASSS() {
+			const domains = ['tech', 'value', 'adopters', 'organization', 'wider', 'embedding', 'adaptation'];
+			let totalScore = 0;
+			let completedDomains = 0;
+
+			domains.forEach(domain => {
+				const inputs = document.querySelectorAll(`input[name^="${domain}_"]`);
+				let domainScore = 0;
+				let domainInputs = 0;
+
+				inputs.forEach(input => {
+					if (input.value) {
+						domainScore += parseInt(input.value);
+						domainInputs++;
+					}
+				});
+
+				if (domainInputs > 0) {
+					const avgScore = domainScore / domainInputs;
+					totalScore += avgScore;
+					completedDomains++;
+
+					// Update complexity indicator
+					const indicator = document.getElementById(`${domain}_complexity`);
+					if (indicator) {
+						if (avgScore >= 4) {
+							indicator.textContent = 'Simple';
+							indicator.className = 'complexity-indicator simple';
+						} else if (avgScore >= 3) {
+							indicator.textContent = 'Complicated';
+							indicator.className = 'complexity-indicator complicated';
+						} else if (avgScore >= 2) {
+							indicator.textContent = 'Complex';
+							indicator.className = 'complexity-indicator complex';
+						} else {
+							indicator.textContent = 'Chaotic';
+							indicator.className = 'complexity-indicator chaotic';
+						}
+					}
+				}
+			});
+
+			if (completedDomains > 0) {
+				const nasssScore = Math.round((totalScore / completedDomains) * 20); // Convert to percentage
+				document.getElementById('nasssScore').textContent = nasssScore + '%';
+				document.getElementById('nasssProgress').style.width = nasssScore + '%';
+
+				assessmentData.nasss = {
+					totalScore: nasssScore,
+					completedDomains,
+					timestamp: new Date().toISOString()
+				};
+
+				updateOverallScore();
+			}
+		}
+
+		function calculateREAIM() {
+			// Implementation of RE-AIM calculation
+			const reachInputs = document.querySelectorAll('input[name^="reach_"], select[name^="reach_"]');
+			const effectivenessInputs = document.querySelectorAll('input[name^="effectiveness_"], select[name^="effectiveness_"]');
+			const adoptionInputs = document.querySelectorAll('input[name^="adoption_"], select[name^="adoption_"]');
+
+			// Calculate reach score
+			let reachScore = 0;
+			let reachCount = 0;
+			reachInputs.forEach(input => {
+				if (input.value) {
+					if (input.type === 'number') {
+						reachScore += Math.min(parseInt(input.value), 100) / 20; // Convert percentage to 5-point scale
+					} else {
+						reachScore += parseInt(input.value);
+					}
+					reachCount++;
+				}
+			});
+
+			if (reachCount > 0) {
+				const avgReach = Math.round((reachScore / reachCount) * 20);
+				document.getElementById('reach_score').textContent = avgReach + '%';
+			}
+
+			// Similar calculations for effectiveness and adoption...
+			updateOverallScore();
+		}
+
+		function calculateMAPS() {
+			const mapsInputs = document.querySelectorAll('input[name^="maps_"]');
+			let totalScore = 0;
+			let inputCount = 0;
+
+			mapsInputs.forEach(input => {
+				if (input.value) {
+					totalScore += parseInt(input.value);
+					inputCount++;
+				}
+			});
+
+			if (inputCount > 0) {
+				const mapsScore = Math.round((totalScore / (inputCount * 4)) * 100); // Convert to percentage
+				document.getElementById('mapsScore').textContent = mapsScore + '%';
+				document.getElementById('mapsProgress').style.width = mapsScore + '%';
+
+				assessmentData.whomaps = {
+					totalScore: mapsScore,
+					inputCount,
+					timestamp: new Date().toISOString()
+				};
+
+				updateOverallScore();
+			}
+		}
+
+		function updateOverallScore() {
+			const nasss = assessmentData.nasss?.totalScore || 0;
+			const reaim = 75; // Placeholder - would be calculated from actual RE-AIM inputs
+			const maps = assessmentData.whomaps?.totalScore || 0;
+
+			const overall = Math.round((nasss + reaim + maps) / 3);
+			document.getElementById('overallScore').textContent = overall + '/100';
+
+			// Update readiness status
+			const statusElement = document.getElementById('readinessStatus');
+			if (overall >= 80) {
+				statusElement.textContent = 'READY FOR PILOT DEPLOYMENT';
+				statusElement.style.color = '#48bb78';
+			} else if (overall >= 60) {
+				statusElement.textContent = 'REQUIRES REFINEMENT';
+				statusElement.style.color = '#ed8936';
+			} else {
+				statusElement.textContent = 'NOT READY FOR DEPLOYMENT';
+				statusElement.style.color = '#f56565';
+			}
+
+			assessmentData.summary = {
+				overallScore: overall,
+				readinessStatus: statusElement.textContent,
+				timestamp: new Date().toISOString()
+			};
+		}
+
+		function exportAssessment() {
+			const exportData = {
+				...assessmentData,
+				methodology: 'Multi-Framework Implementation Assessment',
+				assessor: 'ATLAS Research Team',
+				exportDate: new Date().toISOString()
+			};
+
+			const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_framework_assessment_${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		function generateImplementationPlan() {
+			const plan = `
+ATLAS IMPLEMENTATION PLAN
+Generated: ${new Date().toLocaleString()}
+
+READINESS ASSESSMENT
+====================
+Overall Score: ${assessmentData.summary?.overallScore || 'N/A'}/100
+Status: ${assessmentData.summary?.readinessStatus || 'Assessment Incomplete'}
+
+NASSS Complexity: ${assessmentData.nasss?.totalScore || 'N/A'}%
+RE-AIM Potential: 75% (Placeholder)
+WHO MAPS Readiness: ${assessmentData.whomaps?.totalScore || 'N/A'}%
+
+IMPLEMENTATION PHASES
+=====================
+
+Phase 1: Pilot Preparation (Months 1-3)
+- Complete technical refinements
+- Establish partnerships with pilot sites
+- Develop training materials
+- Secure regulatory approvals
+
+Phase 2: Pilot Deployment (Months 4-6)
+- Deploy in 2-3 selected facilities
+- Intensive monitoring and support
+- Collect implementation data
+- Refine based on real-world feedback
+
+Phase 3: Scale Planning (Months 7-9)
+- Analyze pilot results
+- Develop scaling strategy
+- Secure scale-up funding
+- Create sustainability plan
+
+Phase 4: Scaled Implementation (Months 10-18)
+- Systematic rollout to additional facilities
+- Ongoing monitoring and evaluation
+- Continuous improvement cycles
+- Impact assessment
+
+CRITICAL SUCCESS FACTORS
+========================
+- Strong government partnership from inception
+- Adequate funding for full implementation cycle
+- Robust technical support infrastructure
+- Comprehensive training program
+- Continuous monitoring and evaluation
+
+RISK MITIGATION
+===============
+- Connectivity issues: Robust offline functionality
+- Device limitations: Progressive Web App compatibility
+- Training burden: Intuitive design and minimal training needs
+- Sustainability: Clear value proposition and cost-effectiveness
+`;
+
+			const blob = new Blob([plan], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_implementation_plan_${new Date().toISOString().split('T')[0]}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		function createExecutiveSummary() {
+			const summary = `
+ATLAS EXECUTIVE SUMMARY
+Implementation Readiness Assessment
+
+OVERVIEW
+========
+ATLAS (Adaptive Triage and Local Advisory System) is a clinical decision support system designed specifically for resource-limited healthcare settings, integrating offline-first architecture with AI-enhanced clinical guidance.
+
+KEY FINDINGS
+============
+Overall Readiness Score: ${assessmentData.summary?.overallScore || 'TBD'}/100
+Implementation Status: ${assessmentData.summary?.readinessStatus || 'Under Assessment'}
+
+FRAMEWORK SCORES
+================
+• NASSS Complexity Assessment: ${assessmentData.nasss?.totalScore || 'TBD'}%
+• RE-AIM Implementation Potential: 75% (Provisional)
+• WHO MAPS Scale Readiness: ${assessmentData.whomaps?.totalScore || 'TBD'}%
+
+STRENGTHS
+=========
+✅ Strong technical foundation with offline-first architecture
+✅ Evidence-based clinical content (WHO SMART Guidelines)
+✅ AI enhancement with transparency and explainability
+✅ Designed specifically for resource-limited settings
+✅ Comprehensive evaluation methodology
+
+RECOMMENDATIONS
+===============
+${assessmentData.summary?.overallScore >= 80 ?
+					'✅ PROCEED TO PILOT DEPLOYMENT\n• System demonstrates high readiness for implementation\n• Proceed with pilot site selection and deployment planning' :
+					assessmentData.summary?.overallScore >= 60 ?
+						'⚠️ COMPLETE REFINEMENTS BEFORE DEPLOYMENT\n• Address identified complexity factors\n• Strengthen partnerships and sustainability planning' :
+						'❌ SIGNIFICANT DEVELOPMENT REQUIRED\n• Address fundamental implementation barriers\n• Conduct additional validation and preparation'
+				}
+
+NEXT STEPS
+==========
+1. Complete any remaining assessment items
+2. Address identified risk factors
+3. Develop detailed implementation timeline
+4. Secure necessary partnerships and funding
+5. Initiate pilot planning activities
+
+Assessment Date: ${new Date().toLocaleDateString()}
+Prepared by: ATLAS Research Team
+Contact: shreyas.sreenivas@northeastern.edu
+`;
+
+			const blob = new Blob([summary], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_executive_summary_${new Date().toISOString().split('T')[0]}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		// Initialize
+		updateOverallScore();
+	</script>
+</body>
+
+</html>

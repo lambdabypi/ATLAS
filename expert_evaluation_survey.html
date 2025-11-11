@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ATLAS Expert Evaluation Survey</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			line-height: 1.6;
+			margin: 0;
+			padding: 20px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+
+		.container {
+			max-width: 800px;
+			margin: 0 auto;
+			background: rgba(255, 255, 255, 0.95);
+			backdrop-filter: blur(10px);
+			border-radius: 20px;
+			padding: 30px;
+			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+		}
+
+		h1 {
+			color: #4a5568;
+			text-align: center;
+			margin-bottom: 10px;
+		}
+
+		.subtitle {
+			text-align: center;
+			color: #718096;
+			margin-bottom: 30px;
+			font-style: italic;
+		}
+
+		.section {
+			margin-bottom: 40px;
+			padding: 25px;
+			background: rgba(255, 255, 255, 0.7);
+			border-radius: 15px;
+			border: 1px solid rgba(255, 255, 255, 0.3);
+		}
+
+		.section h2 {
+			color: #2d3748;
+			border-bottom: 2px solid #667eea;
+			padding-bottom: 10px;
+		}
+
+		.form-group {
+			margin-bottom: 20px;
+		}
+
+		label {
+			display: block;
+			margin-bottom: 5px;
+			font-weight: 600;
+			color: #4a5568;
+		}
+
+		input,
+		select,
+		textarea {
+			width: 100%;
+			padding: 12px;
+			border: 2px solid #e2e8f0;
+			border-radius: 8px;
+			font-size: 16px;
+			transition: border-color 0.3s;
+		}
+
+		input:focus,
+		select:focus,
+		textarea:focus {
+			outline: none;
+			border-color: #667eea;
+		}
+
+		.radio-group {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 15px;
+			margin-top: 10px;
+		}
+
+		.radio-item {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+
+		.radio-item input {
+			width: auto;
+		}
+
+		.scenario-box {
+			background: #f7fafc;
+			border: 2px solid #e2e8f0;
+			border-radius: 10px;
+			padding: 20px;
+			margin: 15px 0;
+		}
+
+		.scenario-title {
+			font-weight: bold;
+			color: #2d3748;
+			margin-bottom: 10px;
+		}
+
+		.rating-scale {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin: 10px 0;
+		}
+
+		.rating-labels {
+			display: flex;
+			justify-content: space-between;
+			font-size: 12px;
+			color: #718096;
+			margin-top: 5px;
+		}
+
+		.submit-btn {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: white;
+			padding: 15px 30px;
+			border: none;
+			border-radius: 10px;
+			font-size: 18px;
+			cursor: pointer;
+			width: 100%;
+			margin-top: 20px;
+		}
+
+		.submit-btn:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+		}
+
+		.progress-bar {
+			height: 4px;
+			background: #e2e8f0;
+			border-radius: 2px;
+			margin-bottom: 30px;
+			overflow: hidden;
+		}
+
+		.progress-fill {
+			height: 100%;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			width: 0%;
+			transition: width 0.3s;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>ATLAS Expert Evaluation Survey</h1>
+		<p class="subtitle">Clinical Decision Support System for Resource-Limited Settings</p>
+		<p style="text-align: center; color: #718096; margin-bottom: 30px;">
+			<strong>Estimated Time:</strong> 60-90 minutes | <strong>Compensation:</strong> $100 gift card
+		</p>
+
+		<div class="progress-bar">
+			<div class="progress-fill" id="progressFill"></div>
+		</div>
+
+		<form id="expertSurvey">
+			<!-- Section 1: Demographics & Experience -->
+			<div class="section" data-section="1">
+				<h2>Section 1: Expert Background (5 minutes)</h2>
+
+				<div class="form-group">
+					<label for="expertId">Expert ID (will be provided):</label>
+					<input type="text" id="expertId" name="expertId" required>
+				</div>
+
+				<div class="form-group">
+					<label for="profession">Primary Professional Role:</label>
+					<select id="profession" name="profession" required>
+						<option value="">Select your role</option>
+						<option value="physician">Physician (MD/DO)</option>
+						<option value="nurse">Nurse (RN/NP)</option>
+						<option value="global_health">Global Health Professional</option>
+						<option value="health_informatics">Health Informatics Specialist</option>
+						<option value="other">Other (please specify)</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label for="experience_years">Years of clinical experience:</label>
+					<select id="experience_years" name="experience_years" required>
+						<option value="">Select range</option>
+						<option value="0-2">0-2 years</option>
+						<option value="3-5">3-5 years</option>
+						<option value="6-10">6-10 years</option>
+						<option value="11-15">11-15 years</option>
+						<option value="16+">16+ years</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label for="resource_limited_experience">Experience in resource-limited settings:</label>
+					<div class="radio-group">
+						<div class="radio-item">
+							<input type="radio" id="resource_none" name="resource_experience" value="none" required>
+							<label for="resource_none">No direct experience</label>
+						</div>
+						<div class="radio-item">
+							<input type="radio" id="resource_some" name="resource_experience" value="some" required>
+							<label for="resource_some">Some experience (1-6 months)</label>
+						</div>
+						<div class="radio-item">
+							<input type="radio" id="resource_extensive" name="resource_experience" value="extensive"
+								required>
+							<label for="resource_extensive">Extensive experience (6+ months)</label>
+						</div>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label for="cdss_familiarity">Familiarity with Clinical Decision Support Systems:</label>
+					<div class="rating-scale">
+						<span>Not familiar</span>
+						<input type="range" id="cdss_familiarity" name="cdss_familiarity" min="1" max="5" step="1"
+							required>
+						<span>Very familiar</span>
+					</div>
+					<div class="rating-labels">
+						<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Section 2: System Walkthrough -->
+			<div class="section" data-section="2">
+				<h2>Section 2: System Walkthrough (20 minutes)</h2>
+				<p><strong>Instructions:</strong> Please access the ATLAS system at the provided URL and complete the
+					following tasks. Rate each task on completion and difficulty.</p>
+
+				<div class="scenario-box">
+					<div class="scenario-title">Task 1: Patient Registration</div>
+					<p>Register a new patient with the following details: Maria Santos, 28 years old, pregnant (32
+						weeks)</p>
+
+					<div class="form-group">
+						<label>Task Completion:</label>
+						<div class="radio-group">
+							<div class="radio-item">
+								<input type="radio" name="task1_completion" value="completed" required>
+								<label>Completed successfully</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="task1_completion" value="partial" required>
+								<label>Partially completed</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="task1_completion" value="failed" required>
+								<label>Could not complete</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Task Difficulty (1=Very Easy, 5=Very Difficult):</label>
+						<div class="rating-scale">
+							<input type="range" name="task1_difficulty" min="1" max="5" step="1" required>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="scenario-box">
+					<div class="scenario-title">Task 2: Clinical Consultation</div>
+					<p>Create a consultation for Maria with symptoms: severe headache, visual disturbances, BP 160/110
+					</p>
+
+					<div class="form-group">
+						<label>Task Completion:</label>
+						<div class="radio-group">
+							<div class="radio-item">
+								<input type="radio" name="task2_completion" value="completed" required>
+								<label>Completed successfully</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="task2_completion" value="partial" required>
+								<label>Partially completed</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="task2_completion" value="failed" required>
+								<label>Could not complete</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Task Difficulty:</label>
+						<div class="rating-scale">
+							<input type="range" name="task2_difficulty" min="1" max="5" step="1" required>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="scenario-box">
+					<div class="scenario-title">Task 3: AI Recommendation Review</div>
+					<p>Review the AI-generated clinical recommendations for Maria's case</p>
+
+					<div class="form-group">
+						<label>AI Recommendation Quality:</label>
+						<div class="radio-group">
+							<div class="radio-item">
+								<input type="radio" name="ai_quality" value="excellent" required>
+								<label>Excellent - clinically accurate and helpful</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="ai_quality" value="good" required>
+								<label>Good - mostly accurate with minor issues</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="ai_quality" value="fair" required>
+								<label>Fair - some accuracy but needs improvement</label>
+							</div>
+							<div class="radio-item">
+								<input type="radio" name="ai_quality" value="poor" required>
+								<label>Poor - clinically inaccurate or unhelpful</label>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Section 3: Clinical Scenario Evaluation -->
+			<div class="section" data-section="3">
+				<h2>Section 3: Clinical Scenario Evaluation (25 minutes)</h2>
+
+				<div class="scenario-box">
+					<div class="scenario-title">Scenario A: Pediatric Pneumonia (IMCI)</div>
+					<p><strong>Patient:</strong> 18-month-old child<br>
+						<strong>Presentation:</strong> Fever (39.2°C), fast breathing (52/min), cough for 3 days,
+						feeding normally<br>
+						<strong>Setting:</strong> Rural health center, limited resources
+					</p>
+
+					<div class="form-group">
+						<label>ATLAS recommendation accuracy (compared to WHO IMCI guidelines):</label>
+						<div class="rating-scale">
+							<span>Completely inaccurate</span>
+							<input type="range" name="scenario_a_accuracy" min="1" max="5" step="1" required>
+							<span>Completely accurate</span>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Appropriateness for resource-limited setting:</label>
+						<div class="rating-scale">
+							<span>Inappropriate</span>
+							<input type="range" name="scenario_a_appropriate" min="1" max="5" step="1" required>
+							<span>Very appropriate</span>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Comments on this scenario:</label>
+						<textarea name="scenario_a_comments" rows="3"
+							placeholder="Any specific feedback on the AI recommendations, accuracy, or appropriateness..."></textarea>
+					</div>
+				</div>
+
+				<div class="scenario-box">
+					<div class="scenario-title">Scenario B: Antenatal Care</div>
+					<p><strong>Patient:</strong> 24-year-old, G1P0, 28 weeks pregnant<br>
+						<strong>Presentation:</strong> Routine ANC visit, BP 125/80, fundal height 26cm, fetal movements
+						present<br>
+						<strong>Setting:</strong> District health center
+					</p>
+
+					<div class="form-group">
+						<label>ATLAS recommendation accuracy:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario_b_accuracy" min="1" max="5" step="1" required>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Appropriateness for resource-limited setting:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario_b_appropriate" min="1" max="5" step="1" required>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Comments:</label>
+						<textarea name="scenario_b_comments" rows="3"></textarea>
+					</div>
+				</div>
+			</div>
+
+			<!-- Section 4: System Usability Scale -->
+			<div class="section" data-section="4">
+				<h2>Section 4: System Usability Scale (5 minutes)</h2>
+				<p>Please rate your agreement with each statement:</p>
+
+				<div class="form-group">
+					<label>1. I think that I would like to use this system frequently</label>
+					<div class="radio-group">
+						<div class="radio-item"><input type="radio" name="sus_1" value="1" required><label>Strongly
+								disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_1" value="2"
+								required><label>Disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_1" value="3"
+								required><label>Neutral</label></div>
+						<div class="radio-item"><input type="radio" name="sus_1" value="4" required><label>Agree</label>
+						</div>
+						<div class="radio-item"><input type="radio" name="sus_1" value="5" required><label>Strongly
+								agree</label></div>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label>2. I found the system unnecessarily complex</label>
+					<div class="radio-group">
+						<div class="radio-item"><input type="radio" name="sus_2" value="1" required><label>Strongly
+								disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_2" value="2"
+								required><label>Disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_2" value="3"
+								required><label>Neutral</label></div>
+						<div class="radio-item"><input type="radio" name="sus_2" value="4" required><label>Agree</label>
+						</div>
+						<div class="radio-item"><input type="radio" name="sus_2" value="5" required><label>Strongly
+								agree</label></div>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label>3. I thought the system was easy to use</label>
+					<div class="radio-group">
+						<div class="radio-item"><input type="radio" name="sus_3" value="1" required><label>Strongly
+								disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_3" value="2"
+								required><label>Disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_3" value="3"
+								required><label>Neutral</label></div>
+						<div class="radio-item"><input type="radio" name="sus_3" value="4" required><label>Agree</label>
+						</div>
+						<div class="radio-item"><input type="radio" name="sus_3" value="5" required><label>Strongly
+								agree</label></div>
+					</div>
+				</div>
+
+				<!-- Continue with remaining SUS questions (4-10) -->
+				<div class="form-group">
+					<label>4. I think that I would need the support of a technical person to use this system</label>
+					<div class="radio-group">
+						<div class="radio-item"><input type="radio" name="sus_4" value="1" required><label>Strongly
+								disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_4" value="2"
+								required><label>Disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_4" value="3"
+								required><label>Neutral</label></div>
+						<div class="radio-item"><input type="radio" name="sus_4" value="4" required><label>Agree</label>
+						</div>
+						<div class="radio-item"><input type="radio" name="sus_4" value="5" required><label>Strongly
+								agree</label></div>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label>5. I found the various functions in this system were well integrated</label>
+					<div class="radio-group">
+						<div class="radio-item"><input type="radio" name="sus_5" value="1" required><label>Strongly
+								disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_5" value="2"
+								required><label>Disagree</label></div>
+						<div class="radio-item"><input type="radio" name="sus_5" value="3"
+								required><label>Neutral</label></div>
+						<div class="radio-item"><input type="radio" name="sus_5" value="4" required><label>Agree</label>
+						</div>
+						<div class="radio-item"><input type="radio" name="sus_5" value="5" required><label>Strongly
+								agree</label></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Section 5: Implementation Feasibility -->
+			<div class="section" data-section="5">
+				<h2>Section 5: Implementation Feasibility (10 minutes)</h2>
+
+				<div class="form-group">
+					<label>How likely would you be to recommend ATLAS to colleagues in resource-limited
+						settings?</label>
+					<div class="rating-scale">
+						<span>Not at all likely</span>
+						<input type="range" name="recommend_likelihood" min="0" max="10" step="1" required>
+						<span>Extremely likely</span>
+					</div>
+					<div class="rating-labels">
+						<span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label>What are the main barriers to implementing ATLAS in resource-limited settings? (Select all
+						that apply)</label>
+					<div class="radio-group" style="flex-direction: column;">
+						<div class="radio-item"><input type="checkbox" name="barriers"
+								value="connectivity"><label>Internet connectivity issues</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers" value="devices"><label>Lack of
+								appropriate devices</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers" value="training"><label>Staff
+								training requirements</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers"
+								value="cost"><label>Implementation costs</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers" value="workflow"><label>Workflow
+								integration challenges</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers" value="trust"><label>Provider
+								trust in AI recommendations</label></div>
+						<div class="radio-item"><input type="checkbox" name="barriers" value="maintenance"><label>System
+								maintenance and updates</label></div>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label>Additional comments and suggestions for improvement:</label>
+					<textarea name="final_comments" rows="5"
+						placeholder="Please provide any additional feedback, suggestions for improvement, or concerns about the system..."></textarea>
+				</div>
+			</div>
+
+			<button type="submit" class="submit-btn">Submit Evaluation</button>
+		</form>
+	</div>
+
+	<script>
+		// Progress bar update
+		function updateProgress() {
+			const sections = document.querySelectorAll('.section');
+			const progressFill = document.getElementById('progressFill');
+
+			let visibleSection = 1;
+			sections.forEach((section, index) => {
+				const rect = section.getBoundingClientRect();
+				if (rect.top < window.innerHeight / 2) {
+					visibleSection = index + 1;
+				}
+			});
+
+			const progress = (visibleSection / sections.length) * 100;
+			progressFill.style.width = progress + '%';
+		}
+
+		window.addEventListener('scroll', updateProgress);
+
+		// Form submission
+		document.getElementById('expertSurvey').addEventListener('submit', function (e) {
+			e.preventDefault();
+
+			// Collect form data
+			const formData = new FormData(this);
+			const data = {};
+
+			for (let [key, value] of formData.entries()) {
+				if (data[key]) {
+					if (Array.isArray(data[key])) {
+						data[key].push(value);
+					} else {
+						data[key] = [data[key], value];
+					}
+				} else {
+					data[key] = value;
+				}
+			}
+
+			// Calculate SUS Score
+			const susScores = [];
+			for (let i = 1; i <= 10; i++) {
+				if (data[`sus_${i}`]) {
+					let score = parseInt(data[`sus_${i}`]);
+					if (i % 2 === 1) { // Odd questions
+						susScores.push(score - 1);
+					} else { // Even questions
+						susScores.push(5 - score);
+					}
+				}
+			}
+
+			const susTotal = susScores.reduce((a, b) => a + b, 0) * 2.5;
+			data.sus_score = susTotal;
+
+			// Save data (in real implementation, send to server)
+			console.log('Expert Evaluation Data:', data);
+
+			// Show thank you message
+			alert('Thank you for your evaluation! Your responses have been recorded.');
+
+			// Download data as JSON for backup
+			const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_expert_evaluation_${data.expertId || 'anonymous'}_${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		});
+
+		// Range input value display
+		document.querySelectorAll('input[type="range"]').forEach(range => {
+			const updateValue = () => {
+				const value = range.value;
+				range.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${(value - range.min) / (range.max - range.min) * 100}%, #e2e8f0 ${(value - range.min) / (range.max - range.min) * 100}%, #e2e8f0 100%)`;
+			};
+
+			range.addEventListener('input', updateValue);
+			updateValue();
+		});
+	</script>
+</body>
+
+</html>

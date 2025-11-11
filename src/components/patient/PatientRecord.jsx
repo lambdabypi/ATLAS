@@ -4,10 +4,17 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getConsultationsByPatientId } from '../../lib/db/consultations';
+import { useUserSystem } from '../../lib/auth/simpleUserSystem';
 
 export default function PatientRecord({ patient }) {
 	const [consultations, setConsultations] = useState([]);
 	const [loading, setLoading] = useState(true);
+
+	const { currentUser, hasPermission } = useUserSystem();
+
+	if (!currentUser) {
+		// Return error message or redirect to user selection
+	}
 
 	// Load consultations for this patient
 	useEffect(() => {

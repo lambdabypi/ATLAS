@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ATLAS Clinical Validation Data Collection</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			line-height: 1.6;
+			margin: 0;
+			padding: 20px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+
+		.container {
+			max-width: 1000px;
+			margin: 0 auto;
+			background: rgba(255, 255, 255, 0.95);
+			backdrop-filter: blur(10px);
+			border-radius: 20px;
+			padding: 30px;
+			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+		}
+
+		h1,
+		h2 {
+			color: #4a5568;
+		}
+
+		.form-section {
+			margin-bottom: 30px;
+			padding: 20px;
+			background: rgba(255, 255, 255, 0.7);
+			border-radius: 15px;
+			border: 1px solid rgba(255, 255, 255, 0.3);
+		}
+
+		.scenario-card {
+			border: 2px solid #e2e8f0;
+			border-radius: 10px;
+			padding: 20px;
+			margin: 15px 0;
+			background: #f7fafc;
+		}
+
+		.scenario-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 15px;
+		}
+
+		.scenario-title {
+			font-weight: bold;
+			color: #2d3748;
+			font-size: 18px;
+		}
+
+		.scenario-category {
+			background: #667eea;
+			color: white;
+			padding: 5px 15px;
+			border-radius: 20px;
+			font-size: 12px;
+		}
+
+		.patient-details {
+			background: #ffffff;
+			padding: 15px;
+			border-radius: 8px;
+			margin: 10px 0;
+			border-left: 4px solid #667eea;
+		}
+
+		.expected-outcome {
+			background: #e6fffa;
+			padding: 15px;
+			border-radius: 8px;
+			margin: 10px 0;
+			border-left: 4px solid #38b2ac;
+		}
+
+		.validation-form {
+			background: #fff5f5;
+			padding: 15px;
+			border-radius: 8px;
+			margin: 10px 0;
+			border-left: 4px solid #fc8181;
+		}
+
+		.form-group {
+			margin-bottom: 15px;
+		}
+
+		label {
+			display: block;
+			margin-bottom: 5px;
+			font-weight: 600;
+			color: #4a5568;
+		}
+
+		input,
+		select,
+		textarea {
+			width: 100%;
+			padding: 10px;
+			border: 2px solid #e2e8f0;
+			border-radius: 6px;
+			font-size: 14px;
+		}
+
+		.checkbox-group {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+		}
+
+		.checkbox-item {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+
+		.checkbox-item input {
+			width: auto;
+		}
+
+		.rating-scale {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin: 10px 0;
+		}
+
+		.rating-labels {
+			display: flex;
+			justify-content: space-between;
+			font-size: 12px;
+			color: #718096;
+			margin-top: 5px;
+		}
+
+		.export-btn {
+			background: linear-gradient(135deg, #38b2ac 0%, #319795 100%);
+			color: white;
+			padding: 12px 24px;
+			border: none;
+			border-radius: 8px;
+			cursor: pointer;
+			margin-right: 10px;
+		}
+
+		.summary-stats {
+			background: #f0fff4;
+			padding: 20px;
+			border-radius: 10px;
+			margin: 20px 0;
+			border: 1px solid #c6f6d5;
+		}
+
+		.stats-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: 15px;
+		}
+
+		.stat-item {
+			text-align: center;
+			padding: 15px;
+			background: white;
+			border-radius: 8px;
+		}
+
+		.stat-number {
+			font-size: 24px;
+			font-weight: bold;
+			color: #2d3748;
+		}
+
+		.stat-label {
+			color: #718096;
+			font-size: 14px;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>ATLAS Clinical Validation Data Collection</h1>
+		<p style="color: #718096; margin-bottom: 30px;">
+			Systematic evaluation of AI recommendations against WHO clinical guidelines
+		</p>
+
+		<!-- Summary Statistics -->
+		<div class="summary-stats">
+			<h3>Validation Progress</h3>
+			<div class="stats-grid">
+				<div class="stat-item">
+					<div class="stat-number" id="totalScenarios">0</div>
+					<div class="stat-label">Total Scenarios</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-number" id="completedScenarios">0</div>
+					<div class="stat-label">Completed</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-number" id="averageAccuracy">0%</div>
+					<div class="stat-label">Average Accuracy</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-number" id="guidelineCompliance">0%</div>
+					<div class="stat-label">WHO Compliance</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Controls -->
+		<div class="form-section">
+			<button class="export-btn" onclick="loadTestScenarios()">Load WHO Test Scenarios</button>
+			<button class="export-btn" onclick="exportResults()">Export Results</button>
+			<button class="export-btn" onclick="generateReport()">Generate Clinical Report</button>
+		</div>
+
+		<!-- Scenario Validation Forms -->
+		<div id="scenarioContainer">
+
+			<!-- Scenario 1: Severe Preeclampsia -->
+			<div class="scenario-card">
+				<div class="scenario-header">
+					<div class="scenario-title">Scenario 1: Severe Preeclampsia</div>
+					<div class="scenario-category">MATERNAL HEALTH</div>
+				</div>
+
+				<div class="patient-details">
+					<h4>Patient Information</h4>
+					<p><strong>Demographics:</strong> 28-year-old, G2P1, 36 weeks gestation</p>
+					<p><strong>Vital Signs:</strong> BP 160/110 mmHg, HR 88, Temp 37.1°C</p>
+					<p><strong>Symptoms:</strong> Severe headache, visual disturbances, epigastric pain</p>
+					<p><strong>Lab Results:</strong> Proteinuria 3+, Platelets 95,000</p>
+					<p><strong>Setting:</strong> Rural district hospital, limited specialist availability</p>
+				</div>
+
+				<div class="expected-outcome">
+					<h4>WHO Expected Outcome (Gold Standard)</h4>
+					<p><strong>Diagnosis:</strong> Severe preeclampsia</p>
+					<p><strong>Urgency:</strong> Immediate intervention required</p>
+					<p><strong>Management:</strong> Antihypertensive therapy, magnesium sulfate, urgent referral</p>
+					<p><strong>Monitoring:</strong> Continuous fetal monitoring, hourly vitals</p>
+				</div>
+
+				<div class="validation-form">
+					<h4>ATLAS AI Response Evaluation</h4>
+
+					<div class="form-group">
+						<label>AI Diagnosis Accuracy:</label>
+						<div class="rating-scale">
+							<span>Completely incorrect</span>
+							<input type="range" name="scenario1_diagnosis" min="1" max="5" step="1"
+								onchange="updateScenarioScore(1)">
+							<span>Completely accurate</span>
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Urgency Assessment:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario1_urgency" min="1" max="5" step="1"
+								onchange="updateScenarioScore(1)">
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Treatment Appropriateness:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario1_treatment" min="1" max="5" step="1"
+								onchange="updateScenarioScore(1)">
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>WHO Guideline Compliance Elements Present:</label>
+						<div class="checkbox-group">
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario1_compliance" value="bp_management">
+								<label>Blood pressure management</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario1_compliance" value="seizure_prevention">
+								<label>Seizure prevention (MgSO4)</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario1_compliance" value="urgent_referral">
+								<label>Urgent referral recommended</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario1_compliance" value="fetal_monitoring">
+								<label>Fetal monitoring</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario1_compliance" value="delivery_planning">
+								<label>Delivery planning</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>AI Response Time (seconds):</label>
+						<input type="number" name="scenario1_response_time" placeholder="Enter response time">
+					</div>
+
+					<div class="form-group">
+						<label>Clinical Notes/Concerns:</label>
+						<textarea name="scenario1_notes" rows="3"
+							placeholder="Any clinical concerns, inaccuracies, or notable observations..."></textarea>
+					</div>
+
+					<div class="form-group">
+						<label>Overall Score:</label>
+						<div class="stat-number" id="scenario1_overall" style="color: #667eea;">--%</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Scenario 2: Pediatric Pneumonia (IMCI) -->
+			<div class="scenario-card">
+				<div class="scenario-header">
+					<div class="scenario-title">Scenario 2: Pediatric Pneumonia (IMCI)</div>
+					<div class="scenario-category">IMCI</div>
+				</div>
+
+				<div class="patient-details">
+					<h4>Patient Information</h4>
+					<p><strong>Demographics:</strong> 18-month-old male, 9.5kg</p>
+					<p><strong>Chief Complaint:</strong> Cough and difficulty breathing for 3 days</p>
+					<p><strong>Vital Signs:</strong> Temp 39.2°C, RR 52/min, HR 140</p>
+					<p><strong>Clinical Signs:</strong> Fast breathing, chest indrawing absent, feeding normally</p>
+					<p><strong>Setting:</strong> Rural health center, basic medications available</p>
+				</div>
+
+				<div class="expected-outcome">
+					<h4>WHO IMCI Expected Outcome</h4>
+					<p><strong>Classification:</strong> Pneumonia (not severe)</p>
+					<p><strong>Treatment:</strong> Oral amoxicillin 40mg/kg/day for 5 days</p>
+					<p><strong>Follow-up:</strong> Return in 2 days if not improving, immediately if worse</p>
+					<p><strong>Counseling:</strong> Danger signs, feeding, fluid management</p>
+				</div>
+
+				<div class="validation-form">
+					<h4>ATLAS AI Response Evaluation</h4>
+
+					<div class="form-group">
+						<label>IMCI Classification Accuracy:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario2_classification" min="1" max="5" step="1"
+								onchange="updateScenarioScore(2)">
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Antibiotic Choice & Dosing:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario2_antibiotic" min="1" max="5" step="1"
+								onchange="updateScenarioScore(2)">
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Follow-up Instructions:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario2_followup" min="1" max="5" step="1"
+								onchange="updateScenarioScore(2)">
+						</div>
+						<div class="rating-labels">
+							<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>IMCI Compliance Elements:</label>
+						<div class="checkbox-group">
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario2_compliance" value="age_weight_dosing">
+								<label>Age/weight-based dosing</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario2_compliance" value="danger_signs">
+								<label>Danger signs counseling</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario2_compliance" value="feeding_advice">
+								<label>Feeding advice</label>
+							</div>
+							<div class="checkbox-item">
+								<input type="checkbox" name="scenario2_compliance" value="when_to_return">
+								<label>When to return instructions</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Overall Score:</label>
+						<div class="stat-number" id="scenario2_overall" style="color: #667eea;">--%</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Scenario 3: Normal ANC Visit -->
+			<div class="scenario-card">
+				<div class="scenario-header">
+					<div class="scenario-title">Scenario 3: Routine ANC Visit</div>
+					<div class="scenario-category">MATERNAL HEALTH</div>
+				</div>
+
+				<div class="patient-details">
+					<h4>Patient Information</h4>
+					<p><strong>Demographics:</strong> 25-year-old, G1P0, 24 weeks gestation</p>
+					<p><strong>Vital Signs:</strong> BP 115/75, Weight 62kg (pre-pregnancy 58kg)</p>
+					<p><strong>Clinical:</strong> Fundal height 23cm, FHR 144 bpm, no complaints</p>
+					<p><strong>History:</strong> No complications this pregnancy</p>
+					<p><strong>Setting:</strong> Antenatal clinic, routine visit</p>
+				</div>
+
+				<div class="expected-outcome">
+					<h4>WHO ANC Expected Outcome</h4>
+					<p><strong>Assessment:</strong> Normal pregnancy progression</p>
+					<p><strong>Interventions:</strong> Iron/folate supplementation, tetanus toxoid if due</p>
+					<p><strong>Counseling:</strong> Nutrition, danger signs, birth preparedness</p>
+					<p><strong>Next Visit:</strong> 4 weeks (28 weeks gestation)</p>
+				</div>
+
+				<div class="validation-form">
+					<h4>ATLAS AI Response Evaluation</h4>
+
+					<div class="form-group">
+						<label>Assessment Accuracy:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario3_assessment" min="1" max="5" step="1"
+								onchange="updateScenarioScore(3)">
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Preventive Interventions:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario3_interventions" min="1" max="5" step="1"
+								onchange="updateScenarioScore(3)">
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Counseling Completeness:</label>
+						<div class="rating-scale">
+							<input type="range" name="scenario3_counseling" min="1" max="5" step="1"
+								onchange="updateScenarioScore(3)">
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label>Overall Score:</label>
+						<div class="stat-number" id="scenario3_overall" style="color: #667eea;">--%</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		// Data collection and analysis functions
+		let validationData = {
+			scenarios: {},
+			summary: {
+				totalScenarios: 3,
+				completedScenarios: 0,
+				averageAccuracy: 0,
+				guidelineCompliance: 0
+			}
+		};
+
+		function updateScenarioScore(scenarioNum) {
+			// Get all ratings for this scenario
+			const ratings = [];
+			const elements = document.querySelectorAll(`input[name^="scenario${scenarioNum}_"]:not([type="checkbox"]):not([type="number"]):not([type="text"])`);
+
+			elements.forEach(element => {
+				if (element.type === 'range' && element.value) {
+					ratings.push(parseInt(element.value));
+				}
+			});
+
+			if (ratings.length > 0) {
+				const average = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+				const percentage = Math.round((average / 5) * 100);
+
+				document.getElementById(`scenario${scenarioNum}_overall`).textContent = percentage + '%';
+
+				// Update validation data
+				validationData.scenarios[`scenario${scenarioNum}`] = {
+					scores: ratings,
+					average: percentage,
+					timestamp: new Date().toISOString()
+				};
+
+				updateSummaryStats();
+			}
+		}
+
+		function updateSummaryStats() {
+			const completed = Object.keys(validationData.scenarios).length;
+			const accuracies = Object.values(validationData.scenarios).map(s => s.average).filter(a => a > 0);
+			const avgAccuracy = accuracies.length > 0 ? Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length) : 0;
+
+			document.getElementById('completedScenarios').textContent = completed;
+			document.getElementById('averageAccuracy').textContent = avgAccuracy + '%';
+
+			validationData.summary.completedScenarios = completed;
+			validationData.summary.averageAccuracy = avgAccuracy;
+		}
+
+		function loadTestScenarios() {
+			// This would load additional WHO test scenarios
+			alert('Loading additional WHO test scenarios from DAKs...');
+
+			// Simulate loading more scenarios
+			const additionalScenarios = [
+				'Malaria Case Management',
+				'Hypertension (NCD)',
+				'Child Malnutrition',
+				'TB Screening',
+				'Diabetes Management'
+			];
+
+			console.log('Would load:', additionalScenarios);
+		}
+
+		function exportResults() {
+			// Export validation data
+			const exportData = {
+				...validationData,
+				exportDate: new Date().toISOString(),
+				validator: 'Clinical Expert',
+				methodology: 'WHO Clinical Scenario Validation'
+			};
+
+			const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_clinical_validation_${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		function generateReport() {
+			// Generate clinical validation report
+			const completed = validationData.summary.completedScenarios;
+			const accuracy = validationData.summary.averageAccuracy;
+
+			const report = `
+ATLAS Clinical Validation Report
+Generated: ${new Date().toLocaleString()}
+
+SUMMARY STATISTICS
+==================
+Total Scenarios Evaluated: ${completed}
+Average Diagnostic Accuracy: ${accuracy}%
+WHO Guideline Compliance: ${accuracy > 80 ? 'EXCELLENT' : accuracy > 70 ? 'GOOD' : 'NEEDS IMPROVEMENT'}
+
+CLINICAL RECOMMENDATIONS
+========================
+${accuracy > 80 ? '✅ System demonstrates high clinical accuracy suitable for pilot deployment' :
+					accuracy > 70 ? '⚠️ System shows promise but requires refinement before deployment' :
+						'❌ System requires significant improvement before clinical use'}
+
+DETAILED SCENARIO RESULTS
+=========================
+${Object.entries(validationData.scenarios).map(([scenario, data]) =>
+							`${scenario}: ${data.average}% accuracy`).join('\n')}
+`;
+
+			const blob = new Blob([report], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `atlas_clinical_report_${new Date().toISOString().split('T')[0]}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		// Initialize
+		updateSummaryStats();
+	</script>
+</body>
+
+</html>

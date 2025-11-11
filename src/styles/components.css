@@ -1,4 +1,4 @@
-﻿/* src/styles/components.css - UPDATED with better centering */
+﻿/* src/styles/components.css - FIXED WIDTH CONSTRAINTS */
 /* Component-specific styles */
 
 /* Custom CSS Variables for consistent theming */
@@ -28,36 +28,27 @@
 .atlas-backdrop {
 	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 	min-height: 100vh;
-	width: 100vw;
+	width: 100%;
 	position: relative;
 	margin: 0;
 	padding: 0;
-	/* Ensure full viewport coverage */
 	box-sizing: border-box;
 }
 
-/* FIXED: Main centering container */
-.atlas-page-container {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	min-height: 100vh;
-	width: 100%;
-	padding: 2rem 0;
-	box-sizing: border-box;
-}
+/* REMOVED: atlas-page-container class - was causing centering issues */
+/* Forms should use normal document flow instead of viewport centering */
 
-/* FIXED: Content wrapper with proper constraints */
+/* FIXED: Content wrapper with reasonable constraints */
 .atlas-content-wrapper {
 	width: 100%;
-	max-width: 56rem;
-	/* 896px - equivalent to max-w-4xl */
+	max-width: 64rem;
+	/* 1024px - reasonable max width for forms */
 	margin: 0 auto;
 	padding: 0 1.5rem;
 	box-sizing: border-box;
 }
 
-/* FIXED: Header centering */
+/* FIXED: Header centering for dashboard/landing pages only */
 .atlas-header-center {
 	display: flex;
 	flex-direction: column;
@@ -77,17 +68,16 @@
 	flex-wrap: wrap;
 }
 
-/* Ensure body and html don't interfere with centering */
+/* Ensure body and html don't interfere with layout */
 body,
 html {
 	margin: 0;
 	padding: 0;
 	width: 100%;
-	height: 100%;
 	box-sizing: border-box;
 }
 
-/* Ensure main containers don't interfere with centering */
+/* Ensure main containers don't interfere */
 main {
 	width: 100%;
 	display: block;
@@ -277,15 +267,50 @@ main {
 	outline-offset: 2px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-	.atlas-page-container {
-		padding: 1rem 0;
-		align-items: flex-start;
+/* NEW: Form-specific width constraints */
+.atlas-form-container {
+	max-width: 64rem;
+	/* 1024px max for forms */
+	margin: 0 auto;
+	padding: 0 1rem;
+}
+
+/* NEW: Prevent form elements from growing too wide */
+.atlas-form-section {
+	max-width: 100%;
+	width: 100%;
+}
+
+.atlas-form-grid {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.atlas-form-grid-2 {
+	grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+	.atlas-form-grid-2 {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (min-width: 1024px) {
+	.atlas-form-grid-3 {
+		grid-template-columns: 1fr 1fr 1fr;
 	}
 
+	.atlas-form-grid-4 {
+		grid-template-columns: 1fr 1fr 1fr 1fr;
+	}
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
 	.atlas-content-wrapper {
 		padding: 0 1rem;
+		max-width: 100%;
 	}
 
 	.atlas-status-bar {
@@ -296,6 +321,13 @@ main {
 	.atlas-status-bar>* {
 		width: 100%;
 		justify-content: center;
+	}
+
+	/* Make form elements stack on mobile */
+	.atlas-form-grid-2,
+	.atlas-form-grid-3,
+	.atlas-form-grid-4 {
+		grid-template-columns: 1fr;
 	}
 }
 
@@ -314,6 +346,19 @@ main {
 
 	.atlas-content-wrapper {
 		max-width: 100%;
+		padding: 0 0.75rem;
+	}
+
+	.atlas-form-container {
+		padding: 0 0.75rem;
+	}
+}
+
+/* NEW: Ensure forms don't break on very large screens */
+@media (min-width: 1400px) {
+	.atlas-content-wrapper {
+		max-width: 64rem;
+		/* Keep reasonable max width even on large screens */
 	}
 }
 

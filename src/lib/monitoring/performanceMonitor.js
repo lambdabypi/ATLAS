@@ -147,7 +147,7 @@ export class PerformanceMonitor {
 		const testId = this.startTiming('ai_performance_test');
 
 		try {
-			const { getEnhancedClinicalRecommendations } = await import('../ai/enhancedGemini');
+			const { getEnhancedClinicalRecommendations } = await import('../ai/enhancedHybridAI');
 
 			const samplePatient = {
 				age: '35',

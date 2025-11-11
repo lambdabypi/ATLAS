@@ -1,30 +1,43 @@
 {
-	"name": "clinical-decision-support",
+	"name": "atlas-clinical-decision-support",
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
-		"lint": "next lint"
+		"lint": "next lint",
+		"clean:windows": "if exist .next rmdir /s /q .next & if exist node_modules rmdir /s /q node_modules & if exist package-lock.json del /q package-lock.json",
+		"clean:powershell": "powershell -Command \"Remove-Item -Recurse -Force .next, node_modules, package-lock.json -ErrorAction SilentlyContinue\"",
+		"clean": "powershell -Command \"Remove-Item -Recurse -Force .next, node_modules, package-lock.json -ErrorAction SilentlyContinue\"",
+		"fresh-install": "npm run clean && npm install",
+		"install:verbose": "npm install --verbose",
+		"install:legacy": "npm install --legacy-peer-deps --verbose",
+		"test:imports": "node -e \"try { require('react'); require('next'); console.log('✅ Basic imports work'); } catch(e) { console.log('❌ Import failed:', e.message); }\"",
+		"dev:windows": "set NODE_OPTIONS=--max-old-space-size=4096 && next dev"
 	},
 	"dependencies": {
 		"@google/genai": "^1.22.0",
+		"critters": "^0.0.16",
 		"dexie": "^3.2.4",
-		"idb": "^7.1.1",
-		"next": "^14.0.0",
+		"idb": "^8.0.0",
+		"next": "^14.2.5",
 		"next-pwa": "^5.6.0",
-		"react": "^18.2.0",
-		"react-dom": "^18.2.0",
-		"react-hook-form": "^7.46.1",
-		"swr": "^2.2.4",
-		"workbox-window": "^7.0.0"
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"react-hook-form": "^7.52.1",
+		"swr": "^2.2.5",
+		"workbox-window": "^7.1.0"
 	},
 	"devDependencies": {
-		"@tailwindcss/cli": "^4.1.14",
-		"autoprefixer": "^10.4.21",
-		"eslint": "^8.52.0",
-		"eslint-config-next": "^14.0.0",
-		"postcss": "^8.5.6"
+		"@types/node": "^20.14.10",
+		"@types/react": "^18.3.3",
+		"@types/react-dom": "^18.3.0",
+		"autoprefixer": "^10.4.19",
+		"eslint": "^8.57.0",
+		"eslint-config-next": "^14.2.5",
+		"postcss": "^8.4.39",
+		"tailwindcss": "^3.4.6",
+		"typescript": "^5.5.3"
 	}
 }

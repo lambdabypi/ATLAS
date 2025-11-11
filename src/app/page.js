@@ -1,10 +1,12 @@
-// src/app/page.js - FIXED with proper centering
+// src/app/page.js - FIXED HOOK ORDER ISSUE
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { initializeEnhancedAtlas } from '../lib/initializeEnhancedAtlas';
 import performanceMonitor from '../lib/monitoring/performanceMonitor';
+import { useUserSystem } from '../lib/auth/simpleUserSystem';
+import { UserSelection } from '../components/auth/UserSelection';
 
 // Card data moved outside component for better performance
 const cardData = [
@@ -51,14 +53,27 @@ const cardData = [
 ];
 
 export default function Home() {
+	// ✅ ALWAYS call all hooks at the top level - no conditional hooks
 	const [isDbInitialized, setIsDbInitialized] = useState(false);
-	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+	const [isOnline, setIsOnline] = useState(true); // Default to true for SSR
 	const [initializationError, setInitializationError] = useState(null);
 	const [isInitializing, setIsInitializing] = useState(false);
 
 	// Use ref to prevent double initialization in React StrictMode
 	const hasInitialized = useRef(false);
 
+	// ✅ ALWAYS call user system hook
+	const { currentUser, isInitialized: userSystemInitialized } = useUserSystem();
+
+	// ✅ ALWAYS call all useEffect hooks
+	// Initialize network status only on client-side
+	useEffect(() => {
+		if (typeof navigator !== 'undefined') {
+			setIsOnline(navigator.onLine);
+		}
+	}, []);
+
+	// Main initialization effect
 	useEffect(() => {
 		async function initializeApp() {
 			// Prevent double initialization
@@ -100,37 +115,44 @@ export default function Home() {
 			}
 		}
 
-		initializeApp();
-
-		// Network status handlers
-		const handleOnline = () => setIsOnline(true);
-		const handleOffline = () => setIsOnline(false);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-
-		// Service worker registration
-		if ('serviceWorker' in navigator && typeof window !== 'undefined') {
-			window.addEventListener('load', () => {
-				navigator.serviceWorker.register('/service-worker.js').then(
-					(registration) => {
-						console.log('Service Worker registered with scope:', registration.scope);
-					},
-					(err) => {
-						console.log('Service Worker registration failed:', err);
-					}
-				);
-			});
+		// Only initialize if user system is ready and we have a user
+		if (userSystemInitialized && currentUser) {
+			initializeApp();
 		}
 
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
-	}, []); // Empty dependency array - only run once
+		// Network status handlers - only add if in browser
+		if (typeof window !== 'undefined') {
+			const handleOnline = () => setIsOnline(true);
+			const handleOffline = () => setIsOnline(false);
 
-	// Handle keyboard shortcuts
+			window.addEventListener('online', handleOnline);
+			window.addEventListener('offline', handleOffline);
+
+			// Service worker registration
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', () => {
+					navigator.serviceWorker.register('/service-worker.js').then(
+						(registration) => {
+							console.log('Service Worker registered with scope:', registration.scope);
+						},
+						(err) => {
+							console.log('Service Worker registration failed:', err);
+						}
+					);
+				});
+			}
+
+			return () => {
+				window.removeEventListener('online', handleOnline);
+				window.removeEventListener('offline', handleOffline);
+			};
+		}
+	}, [userSystemInitialized, currentUser]); // Depend on user system state
+
+	// Handle keyboard shortcuts - only in browser
 	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
 		const handleKeyPress = (e) => {
 			// Check if Alt key is pressed and it's a letter key
 			if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -154,6 +176,34 @@ export default function Home() {
 		return () => window.removeEventListener('keydown', handleKeyPress);
 	}, []); // No dependencies needed since cardData is outside component
 
+	// ✅ NOW handle conditional rendering in JSX - after all hooks are called
+	// Show user selection if user system is initialized but no user selected
+	if (userSystemInitialized && !currentUser) {
+		return <UserSelection onUserSelected={(user) => {
+			// User selection handled by the hook, page will re-render
+			console.log('User selected:', user);
+		}} />;
+	}
+
+	// Show loading while user system initializes
+	if (!userSystemInitialized) {
+		return (
+			<div className="atlas-backdrop">
+				<div className="atlas-page-container">
+					<div className="atlas-content-wrapper">
+						<div className="flex justify-center items-center min-h-64">
+							<div className="text-center">
+								<div className="atlas-spinner mb-4"></div>
+								<span className="text-gray-600">Initializing ATLAS...</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	// Main app UI
 	return (
 		<div className="atlas-backdrop">
 			{/* Use the atlas-page-container class for centering */}
@@ -173,6 +223,15 @@ export default function Home() {
 						<p className="text-lg text-gray-600 max-w-xl mx-auto mb-8">
 							Clinical decision support for resource-limited healthcare
 						</p>
+
+						{/* Show current user info */}
+						{currentUser && (
+							<div className="mb-4 text-center">
+								<p className="text-sm text-gray-600">
+									Logged in as: <span className="font-medium">{currentUser.badge} {currentUser.name}</span>
+								</p>
+							</div>
+						)}
 
 						{/* Clean Status Bar with centering */}
 						<div className="atlas-status-bar">
