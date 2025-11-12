@@ -187,7 +187,7 @@ const nextConfig = {
 		return config;
 	},
 
-	// ENHANCED: Windows-friendly headers + Transformers.js requirements + PWA headers
+	// ENHANCED: Windows-friendly headers + Transformers.js requirements + PWA headers + Error fixes
 	async headers() {
 		return [
 			{
@@ -228,13 +228,53 @@ const nextConfig = {
 					] : []),
 				],
 			},
+			// FIX: Manifest.json 401 error - serve without authentication
+			{
+				source: '/manifest.json',
+				headers: [
+					{
+						key: 'Content-Type',
+						value: 'application/json',
+					},
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=0, must-revalidate',
+					},
+					{
+						key: 'Access-Control-Allow-Origin',
+						value: '*',
+					},
+				],
+			},
 			// ADDED: Service worker headers for proper caching
 			{
 				source: '/sw.js',
 				headers: [
 					{
+						key: 'Content-Type',
+						value: 'application/javascript',
+					},
+					{
 						key: 'Cache-Control',
 						value: 'public, max-age=0, must-revalidate',
+					},
+					{
+						key: 'Access-Control-Allow-Origin',
+						value: '*',
+					},
+				],
+			},
+			// FIX: Ensure PWA icons are accessible
+			{
+				source: '/icons/:path*',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=31536000',
+					},
+					{
+						key: 'Access-Control-Allow-Origin',
+						value: '*',
 					},
 				],
 			},

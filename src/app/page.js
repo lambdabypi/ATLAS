@@ -253,6 +253,47 @@ export default function Home() {
 		}
 	}, [userSystemInitialized, currentUser]);
 
+	useEffect(() => {
+		if (typeof window !== 'undefined') {
+			// Suppress non-critical Transformers.js worker errors
+			const originalError = window.console.error;
+
+			window.console.error = (...args) => {
+				const message = args.join(' ');
+
+				// Skip logging these specific Transformers.js errors that don't affect functionality
+				if (
+					message.includes('S.replace is not a function') ||
+					message.includes('worker.js onmessage()') ||
+					message.includes('worker sent an error')
+				) {
+					return; // Don't log these non-critical errors
+				}
+
+				// Log all other errors normally
+				originalError.apply(console, args);
+			};
+
+			// Handle unhandled promise rejections from Transformers.js
+			const handleRejection = (event) => {
+				if (
+					event.reason?.message?.includes('S.replace is not a function') ||
+					event.reason?.message?.includes('worker.js')
+				) {
+					event.preventDefault();
+					console.warn('Suppressed non-critical Transformers.js worker error');
+				}
+			};
+
+			window.addEventListener('unhandledrejection', handleRejection);
+
+			return () => {
+				window.console.error = originalError;
+				window.removeEventListener('unhandledrejection', handleRejection);
+			};
+		}
+	}, []);
+
 	// ✅ Handle conditional rendering - SSR safe
 	// Show loading during SSR or initial client hydration
 	if (!isClientSide) {
