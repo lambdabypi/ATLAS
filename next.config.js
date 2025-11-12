@@ -106,6 +106,35 @@ const withPWA = require('next-pwa')({
 				},
 			},
 		},
+		{
+			// Handle Next.js RSC requests (_rsc parameter)
+			urlPattern: /^https:\/\/.*\/.*\?.*_rsc=.*/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-rsc-requests',
+				networkTimeoutSeconds: 2,
+				expiration: {
+					maxEntries: 300,
+					maxAgeSeconds: 60 * 60, // 1 hour
+				},
+				cacheableResponse: {
+					statuses: [0, 200],
+				},
+				plugins: [
+					{
+						// Custom plugin to handle RSC failures
+						handlerDidError: async ({ request }) => {
+							console.log('RSC request failed offline:', request.url);
+							// Return a minimal valid response for failed RSC requests
+							return new Response('{}', {
+								status: 200,
+								headers: { 'Content-Type': 'application/json' }
+							});
+						},
+					},
+				],
+			},
+		},
 	],
 
 	// ADDED: Custom fallback for offline pages
