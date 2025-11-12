@@ -1,10 +1,117 @@
-// next.config.js - MERGED VERSION with Transformers.js support
+// next.config.js - FIXED VERSION with proper PWA offline support
 const withPWA = require('next-pwa')({
 	dest: 'public',
 	register: true,
 	skipWaiting: true,
-	sw: 'service-worker.js',
-	disable: process.env.NODE_ENV === 'development'
+	// FIXED: Changed from 'service-worker.js' to 'sw.js' to match your actual SW
+	sw: 'sw.js',
+	disable: process.env.NODE_ENV === 'development',
+
+	// ADDED: Custom runtime caching for your dynamic routes
+	runtimeCaching: [
+		// Cache your main app pages with NetworkFirst
+		{
+			urlPattern: /^https:\/\/.*\/(dashboard|patients|consultation|reference)$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-main-pages',
+				networkTimeoutSeconds: 5,
+				expiration: {
+					maxEntries: 50,
+					maxAgeSeconds: 24 * 60 * 60, // 24 hours
+				},
+			},
+		},
+		// CRITICAL: Cache dynamic patient routes like /patients/1, /patients/2 etc.
+		{
+			urlPattern: /^https:\/\/.*\/patients\/\d+$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-patient-pages',
+				networkTimeoutSeconds: 5,
+				expiration: {
+					maxEntries: 100,
+					maxAgeSeconds: 24 * 60 * 60, // 24 hours
+				},
+				cacheableResponse: {
+					statuses: [0, 200],
+				},
+			},
+		},
+		// Cache consultation routes
+		{
+			urlPattern: /^https:\/\/.*\/consultation\/\d+$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-consultation-pages',
+				networkTimeoutSeconds: 5,
+				expiration: {
+					maxEntries: 50,
+					maxAgeSeconds: 24 * 60 * 60,
+				},
+			},
+		},
+		// CRITICAL: Cache API routes for offline data access
+		{
+			urlPattern: /^https:\/\/.*\/api\/patients\/\d+$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-patient-api',
+				networkTimeoutSeconds: 3,
+				expiration: {
+					maxEntries: 200,
+					maxAgeSeconds: 60 * 60, // 1 hour
+				},
+				cacheableResponse: {
+					statuses: [0, 200],
+				},
+			},
+		},
+		// Cache consultation API routes
+		{
+			urlPattern: /^https:\/\/.*\/api\/consultations\/\d+$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-consultation-api',
+				networkTimeoutSeconds: 3,
+				expiration: {
+					maxEntries: 200,
+					maxAgeSeconds: 60 * 60, // 1 hour
+				},
+			},
+		},
+		// Cache general API routes (patients list, etc.)
+		{
+			urlPattern: /^https:\/\/.*\/api\/(patients|consultations|reference)$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-general-api',
+				networkTimeoutSeconds: 3,
+				expiration: {
+					maxEntries: 50,
+					maxAgeSeconds: 30 * 60, // 30 minutes
+				},
+			},
+		},
+		// Fallback for any other pages - this ensures offline access
+		{
+			urlPattern: /^https:\/\/.*\/.*$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-fallback-pages',
+				networkTimeoutSeconds: 5,
+				expiration: {
+					maxEntries: 100,
+					maxAgeSeconds: 24 * 60 * 60,
+				},
+			},
+		},
+	],
+
+	// ADDED: Custom fallback for offline pages
+	fallbacks: {
+		document: '/offline.html', // Create this file in public/
+	},
 });
 
 /** @type {import('next').NextConfig} */
@@ -80,7 +187,7 @@ const nextConfig = {
 		return config;
 	},
 
-	// ENHANCED: Windows-friendly headers + Transformers.js requirements
+	// ENHANCED: Windows-friendly headers + Transformers.js requirements + PWA headers
 	async headers() {
 		return [
 			{
@@ -119,6 +226,16 @@ const nextConfig = {
 							value: 'Content-Type, Authorization',
 						},
 					] : []),
+				],
+			},
+			// ADDED: Service worker headers for proper caching
+			{
+				source: '/sw.js',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=0, must-revalidate',
+					},
 				],
 			},
 			// Specific headers for model files

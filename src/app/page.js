@@ -205,6 +205,54 @@ export default function Home() {
 		return () => window.removeEventListener('keydown', handleKeyPress);
 	}, [isClientSide]); // Depend on isClientSide
 
+	useEffect(() => {
+		if (typeof window !== 'undefined') {
+			const handleOnline = () => setIsOnline(true);
+			const handleOffline = () => setIsOnline(false);
+
+			window.addEventListener('online', handleOnline);
+			window.addEventListener('offline', handleOffline);
+
+			// Enhanced Service worker registration
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', () => {
+					navigator.serviceWorker.register('/sw.js') // Note: your current SW is at /sw.js not /service-worker.js
+						.then((registration) => {
+							console.log('✅ Service Worker registered with scope:', registration.scope);
+
+							// Listen for updates
+							registration.addEventListener('updatefound', () => {
+								const newWorker = registration.installing;
+								if (newWorker) {
+									newWorker.addEventListener('statechange', () => {
+										if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+											console.log('🔄 New service worker available');
+										}
+									});
+								}
+							});
+						})
+						.catch((err) => {
+							console.error('❌ Service Worker registration failed:', err);
+						});
+
+					// Handle service worker messages
+					navigator.serviceWorker.addEventListener('message', (event) => {
+						if (event.data && event.data.type === 'OFFLINE_FALLBACK') {
+							console.log('📱 App is running in offline mode');
+							// You can show a notification here
+						}
+					});
+				});
+			}
+
+			return () => {
+				window.removeEventListener('online', handleOnline);
+				window.removeEventListener('offline', handleOffline);
+			};
+		}
+	}, [userSystemInitialized, currentUser]);
+
 	// ✅ Handle conditional rendering - SSR safe
 	// Show loading during SSR or initial client hydration
 	if (!isClientSide) {
