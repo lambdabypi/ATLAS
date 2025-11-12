@@ -1,4 +1,4 @@
-// src/app/page.js - FULLY SSR COMPATIBLE VERSION WITH CLEAN SW REGISTRATION
+// src/app/page.js - FULLY SSR COMPATIBLE VERSION WITH RELOAD FIX
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -148,7 +148,7 @@ export default function Home() {
 		}
 	}, [isClientSide, userSystemInitialized, currentUser]); // Include isClientSide dependency
 
-	// CLEAN SERVICE WORKER REGISTRATION + NETWORK HANDLERS
+	// IMPROVED SERVICE WORKER REGISTRATION WITH RELOAD FIX
 	useEffect(() => {
 		if (!isClientSide) return;
 
@@ -158,66 +158,120 @@ export default function Home() {
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
 
-		// SINGLE, CLEAN SERVICE WORKER REGISTRATION
+		// IMPROVED SERVICE WORKER REGISTRATION
 		if ('serviceWorker' in navigator) {
 			const registerSW = async () => {
 				try {
-					// Unregister any existing service workers first
-					const registrations = await navigator.serviceWorker.getRegistrations();
-					for (const registration of registrations) {
-						console.log('🗑️ Unregistering old SW:', registration.scope);
-						await registration.unregister();
-					}
-
-					// Register the correct service worker
+					// Register service worker
 					const registration = await navigator.serviceWorker.register('/sw.js', {
 						scope: '/',
 						updateViaCache: 'none'
 					});
 
-					console.log('✅ Service Worker registered successfully:', registration.scope);
+					console.log('✅ Service Worker registered:', registration.scope);
 
-					// Wait for the service worker to be ready
-					await navigator.serviceWorker.ready;
-					console.log('🚀 Service Worker is ready and controlling the page');
+					// CRITICAL: Ensure SW controls the page immediately
+					if (!navigator.serviceWorker.controller) {
+						// Wait for the SW to take control
+						await new Promise((resolve) => {
+							navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
 
-					// Test cache immediately after registration
-					await testCaching();
+							// Force immediate activation
+							const sw = registration.installing || registration.waiting || registration.active;
+							if (sw && sw.state !== 'activated') {
+								sw.postMessage({ type: 'SKIP_WAITING' });
+							} else {
+								resolve();
+							}
+						});
+					}
+
+					console.log('🎯 Service Worker is controlling the page');
+
+					// CACHE CURRENT PAGE IMMEDIATELY with reload-specific keys
+					await cacheForReload();
 
 				} catch (error) {
-					console.error('❌ Service Worker registration failed:', error);
+					console.error('❌ SW registration failed:', error);
 				}
 			};
 
-			// Test if caching is working
-			const testCaching = async () => {
+			// Cache specifically for reload scenarios
+			const cacheForReload = async () => {
 				try {
-					console.log('🧪 Testing cache functionality...');
+					const cache = await caches.open('atlas-reload-cache');
+					const currentURL = window.location.href;
 
-					// Check what caches exist
-					const cacheNames = await caches.keys();
-					console.log('📦 Available caches:', cacheNames);
+					console.log('🔄 Caching for reload:', currentURL);
 
-					// Force cache the current page
-					const cache = await caches.open('atlas-test-cache');
-					await cache.add(new Request(window.location.href, { cache: 'reload' }));
-					console.log('✅ Test: Current page cached manually');
+					// Cache with different request types that match reload patterns
+					const requests = [
+						new Request(currentURL),
+						new Request(currentURL, { cache: 'default' }),
+						new Request(currentURL, { cache: 'reload' }),
+						new Request(currentURL, { mode: 'navigate' }),
+					];
 
-					// Check cache contents
-					const cachedRequests = await cache.keys();
-					console.log('📋 Cache contents:', cachedRequests.map(req => req.url));
+					for (const request of requests) {
+						try {
+							const response = await fetch(request);
+							if (response.ok) {
+								await cache.put(request, response.clone());
+								console.log('✅ Cached request type:', request.cache || 'default');
+							}
+						} catch (err) {
+							// Silent fail - try next request type
+						}
+					}
+
+					// Also cache the HTML content directly
+					try {
+						const response = await fetch(currentURL);
+						const html = await response.text();
+						const htmlResponse = new Response(html, {
+							headers: { 'Content-Type': 'text/html' }
+						});
+
+						await cache.put(currentURL, htmlResponse);
+						await cache.put(new Request(currentURL, { cache: 'reload' }), htmlResponse.clone());
+						console.log('✅ HTML content cached for reloads');
+					} catch (err) {
+						console.warn('⚠️ Failed to cache HTML directly:', err.message);
+					}
+
+					console.log('🎉 Reload cache complete');
 
 				} catch (error) {
-					console.error('❌ Cache test failed:', error);
+					console.error('❌ Reload cache failed:', error);
 				}
 			};
 
-			// Register SW when page loads
-			if (document.readyState === 'loading') {
-				window.addEventListener('load', registerSW);
-			} else {
+			// Register when page is ready
+			if (document.readyState === 'complete') {
 				registerSW();
+			} else {
+				window.addEventListener('load', registerSW);
 			}
+
+			// HANDLE PAGE RELOADS WHEN OFFLINE
+			const handleBeforeUnload = (event) => {
+				if (!navigator.onLine && 'caches' in window) {
+					console.log('⚠️ Reload detected while offline - ensuring cache is ready');
+
+					// Last-chance cache before reload
+					caches.open('atlas-reload-cache').then(cache => {
+						cache.add(new Request(window.location.href, { cache: 'reload' }));
+					}).catch(() => {
+						// Silent fail
+					});
+				}
+			};
+
+			window.addEventListener('beforeunload', handleBeforeUnload);
+
+			return () => {
+				window.removeEventListener('beforeunload', handleBeforeUnload);
+			};
 		}
 
 		return () => {
