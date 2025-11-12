@@ -1,4 +1,3 @@
-const offlineHtml = `
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,16 +6,11 @@ const offlineHtml = `
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>ATLAS - Offline</title>
 	<style>
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
-
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 			color: white;
+			margin: 0;
 			min-height: 100vh;
 			display: flex;
 			align-items: center;
@@ -26,108 +20,40 @@ const offlineHtml = `
 
 		.container {
 			text-align: center;
-			max-width: 500px;
+			max-width: 400px;
 			background: rgba(255, 255, 255, 0.1);
-			padding: 3rem 2rem;
+			padding: 2rem;
 			border-radius: 16px;
 			backdrop-filter: blur(10px);
-			border: 1px solid rgba(255, 255, 255, 0.2);
 		}
 
 		.icon {
-			font-size: 4rem;
-			margin-bottom: 1.5rem;
-			animation: pulse 2s infinite;
-		}
-
-		@keyframes pulse {
-
-			0%,
-			100% {
-				transform: scale(1);
-				opacity: 1;
-			}
-
-			50% {
-				transform: scale(1.1);
-				opacity: 0.8;
-			}
+			font-size: 3rem;
+			margin-bottom: 1rem;
 		}
 
 		h1 {
-			font-size: 2.5rem;
+			font-size: 2rem;
 			margin-bottom: 1rem;
-			font-weight: 700;
 		}
 
 		p {
-			font-size: 1.1rem;
-			margin-bottom: 2rem;
+			margin-bottom: 1.5rem;
 			opacity: 0.9;
-			line-height: 1.5;
-		}
-
-		.status {
-			background: rgba(255, 255, 255, 0.2);
-			padding: 1rem;
-			border-radius: 8px;
-			margin: 2rem 0;
-			border: 1px solid rgba(255, 255, 255, 0.3);
 		}
 
 		.retry-btn {
 			background: rgba(255, 255, 255, 0.2);
 			color: white;
 			border: 2px solid rgba(255, 255, 255, 0.3);
-			padding: 0.75rem 2rem;
+			padding: 0.75rem 1.5rem;
 			border-radius: 8px;
 			cursor: pointer;
 			font-size: 1rem;
-			font-weight: 500;
-			transition: all 0.3s ease;
 		}
 
 		.retry-btn:hover {
 			background: rgba(255, 255, 255, 0.3);
-			border-color: rgba(255, 255, 255, 0.5);
-			transform: translateY(-2px);
-		}
-
-		.features {
-			text-align: left;
-			margin: 2rem 0;
-		}
-
-		.features ul {
-			list-style: none;
-			padding: 0;
-		}
-
-		.features li {
-			padding: 0.5rem 0;
-			opacity: 0.8;
-		}
-
-		.features li::before {
-			content: "✓ ";
-			color: #4ade80;
-			font-weight: bold;
-			margin-right: 0.5rem;
-		}
-
-		@media (max-width: 640px) {
-			.container {
-				padding: 2rem 1.5rem;
-				margin: 1rem;
-			}
-
-			h1 {
-				font-size: 2rem;
-			}
-
-			.icon {
-				font-size: 3rem;
-			}
 		}
 	</style>
 </head>
@@ -136,47 +62,16 @@ const offlineHtml = `
 	<div class="container">
 		<div class="icon">🏥</div>
 		<h1>ATLAS</h1>
-		<p>You're currently offline, but ATLAS continues to work with cached data.</p>
-
-		<div class="status">
-			<strong>🔍 Offline Mode Active</strong><br>
-			Limited functionality available using cached content
-		</div>
-
-		<div class="features">
-			<h3 style="margin-bottom: 1rem;">Available Offline:</h3>
-			<ul>
-				<li>View cached patient records</li>
-				<li>Browse clinical guidelines</li>
-				<li>Access consultation templates</li>
-				<li>Use basic clinical calculators</li>
-			</ul>
-		</div>
-
+		<p>You're offline, but cached content is available.</p>
 		<button class="retry-btn" onclick="window.location.reload()">
-			🔄 Try Again
+			Try Again
 		</button>
-
-		<p style="margin-top: 2rem; font-size: 0.9rem; opacity: 0.7;">
-			You'll automatically get full functionality when internet connection is restored.
-		</p>
 	</div>
-
 	<script>
-		// Auto-reload when online
 		window.addEventListener('online', () => {
-			console.log('Back online - reloading...');
 			window.location.reload();
 		});
-
-		// Show online status
-		if (navigator.onLine) {
-			document.querySelector('.status').innerHTML =
-				'<strong>🌐 Connection Restored</strong><br>Reloading page...';
-			setTimeout(() => window.location.reload(), 1000);
-		}
 	</script>
 </body>
 
 </html>
-`;
