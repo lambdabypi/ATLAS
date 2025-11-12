@@ -1,159 +1,215 @@
-// next.config.js - ENHANCED for RSC Offline Support
+// next.config.js - FIXED Navigation Handling
 const withPWA = require('next-pwa')({
 	dest: 'public',
 	register: true,
 	skipWaiting: true,
 	disable: process.env.NODE_ENV === 'development',
 
-	// CRITICAL: Enhanced runtime caching for Next.js RSC
+	// CRITICAL: Reordered and enhanced caching strategies
 	runtimeCaching: [
-		// FIXED: Handle Next.js RSC payloads specifically
+		// PRIORITY 1: Handle navigation requests (page loads/reloads) FIRST
 		{
-			urlPattern: /\/_next\/static\/chunks\/.*\.js$/,
-			handler: 'CacheFirst',
+			urlPattern: ({ request }) => request.mode === 'navigate',
+			handler: 'CacheFirst', // Changed to CacheFirst for instant offline loading
 			options: {
-				cacheName: 'next-chunks',
-				expiration: {
-					maxEntries: 200,
-					maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
-				},
-			},
-		},
-		{
-			urlPattern: /\/_next\/static\/.*$/,
-			handler: 'CacheFirst',
-			options: {
-				cacheName: 'next-static-assets',
-				expiration: {
-					maxEntries: 300,
-					maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
-				},
-			},
-		},
-		// CRITICAL: RSC payload caching with fallback
-		{
-			urlPattern: /^https:\/\/.*\?.*_rsc=.*$/,
-			handler: 'NetworkFirst',
-			options: {
-				cacheName: 'next-rsc-payloads',
-				networkTimeoutSeconds: 2, // Quick timeout
-				expiration: {
-					maxEntries: 100,
-					maxAgeSeconds: 24 * 60 * 60, // 1 day
-				},
-				plugins: [
-					{
-						// FIXED: Custom RSC fallback
-						handlerDidError: async () => {
-							// Return minimal RSC response that won't break Next.js
-							return new Response('null', {
-								status: 200,
-								headers: {
-									'Content-Type': 'text/x-component',
-									'Cache-Control': 'no-cache'
-								}
-							});
-						},
-					},
-				],
-			},
-		},
-		// Navigation requests (pages)
-		{
-			urlPattern: /^https:\/\/.*\/(?:dashboard|patients|consultation|reference|testing)(?:\/.*)?$/,
-			handler: 'NetworkFirst',
-			options: {
-				cacheName: 'atlas-pages',
-				networkTimeoutSeconds: 3,
+				cacheName: 'atlas-navigation',
 				expiration: {
 					maxEntries: 50,
 					maxAgeSeconds: 24 * 60 * 60, // 1 day
 				},
 				plugins: [
 					{
-						// FIXED: Page fallback with error handling
-						handlerDidError: async ({ request }) => {
-							const cache = await caches.open('atlas-pages');
-							// Try to find any cached page as fallback
-							const cachedResponse = await cache.match(request) ||
-								await cache.match('/dashboard') ||
-								await cache.match('/');
-							if (cachedResponse) {
-								return cachedResponse;
+						// CRITICAL: Navigation fallback strategy
+						cacheKeyWillBeUsed: async ({ request }) => {
+							// For dynamic routes, use base route as cache key
+							const url = new URL(request.url);
+							let pathname = url.pathname;
+
+							// Map dynamic routes to their base routes
+							if (pathname.includes('/consultation/new')) {
+								return `${url.origin}/consultation/new`;
 							}
-							// Final fallback - return offline page or basic HTML
+							if (pathname.match(/\/patients\/\d+/)) {
+								return `${url.origin}/patients/1`; // Use cached patient page
+							}
+							if (pathname.match(/\/consultation\/\d+/)) {
+								return `${url.origin}/consultation/new`; // Fallback to new consultation
+							}
+
+							return request.url;
+						},
+
+						cacheWillUpdate: async ({ response }) => {
+							// Cache successful HTML responses
+							return response.status === 200 &&
+								response.headers.get('content-type')?.includes('text/html');
+						},
+
+						handlerDidError: async ({ request }) => {
+							console.log('🔄 Navigation fallback for:', request.url);
+							const url = new URL(request.url);
+							const pathname = url.pathname;
+
+							// Try progressive fallbacks
+							const cache = await caches.open('atlas-navigation');
+
+							// 1. Try exact match
+							let fallback = await cache.match(request.url);
+							if (fallback) return fallback;
+
+							// 2. Try base route for dynamic routes
+							if (pathname.includes('/consultation')) {
+								fallback = await cache.match(`${url.origin}/consultation`) ||
+									await cache.match(`${url.origin}/consultation/new`);
+								if (fallback) return fallback;
+							}
+
+							if (pathname.includes('/patients')) {
+								fallback = await cache.match(`${url.origin}/patients`);
+								if (fallback) return fallback;
+							}
+
+							// 3. Try dashboard as ultimate fallback
+							fallback = await cache.match(`${url.origin}/dashboard`);
+							if (fallback) return fallback;
+
+							// 4. Try root as last resort
+							fallback = await cache.match(`${url.origin}/`);
+							if (fallback) return fallback;
+
+							// 5. Final fallback - custom offline page
 							return new Response(`
                                 <!DOCTYPE html>
                                 <html>
-                                <head><title>ATLAS - Offline</title></head>
+                                <head>
+                                    <title>ATLAS - Offline</title>
+                                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                                    <style>
+                                        body { 
+                                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                            display: flex; align-items: center; justify-content: center;
+                                            min-height: 100vh; margin: 0; 
+                                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                            color: white; text-align: center;
+                                        }
+                                        .container { background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 1rem; }
+                                        .logo { font-size: 3rem; margin-bottom: 1rem; }
+                                        .btn { 
+                                            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
+                                            padding: 1rem 2rem; border-radius: 0.5rem; text-decoration: none; 
+                                            display: inline-block; margin-top: 1rem;
+                                        }
+                                    </style>
+                                </head>
                                 <body>
-                                    <h1>🏥 ATLAS Offline</h1>
-                                    <p>You're offline. Core features are still available.</p>
+                                    <div class="container">
+                                        <div class="logo">🏥</div>
+                                        <h1>ATLAS Offline</h1>
+                                        <p>This page isn't cached yet. Try accessing it online first.</p>
+                                        <p><strong>Requested:</strong> ${pathname}</p>
+                                        <a href="/dashboard" class="btn">Go to Dashboard</a>
+                                        <a href="javascript:location.reload()" class="btn">Retry</a>
+                                    </div>
                                     <script>
-                                        if ('serviceWorker' in navigator) {
-                                            // Try to reload when back online
-                                            navigator.serviceWorker.addEventListener('message', e => {
-                                                if (e.data.type === 'BACK_ONLINE') {
-                                                    window.location.reload();
+                                        // Auto-reload when back online
+                                        window.addEventListener('online', () => location.reload());
+                                        
+                                        // Try to redirect to cached pages
+                                        if ('caches' in window) {
+                                            caches.match('/dashboard').then(response => {
+                                                if (response && !navigator.onLine) {
+                                                    setTimeout(() => window.location.href = '/dashboard', 3000);
                                                 }
                                             });
                                         }
-                                        
-                                        window.addEventListener('online', () => {
-                                            window.location.reload();
-                                        });
                                     </script>
                                 </body>
                                 </html>
                             `, {
-								headers: { 'Content-Type': 'text/html' }
+								status: 200,
+								headers: {
+									'Content-Type': 'text/html',
+									'Cache-Control': 'no-cache'
+								}
+							});
+						}
+					}
+				]
+			}
+		},
+
+		// PRIORITY 2: Handle Next.js static assets
+		{
+			urlPattern: /\/_next\/static\/.*$/,
+			handler: 'CacheFirst',
+			options: {
+				cacheName: 'next-static',
+				expiration: {
+					maxEntries: 200,
+					maxAgeSeconds: 365 * 24 * 60 * 60,
+				},
+			},
+		},
+
+		// PRIORITY 3: Handle API requests
+		{
+			urlPattern: /\/api\/.*$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-api',
+				networkTimeoutSeconds: 3,
+				expiration: {
+					maxEntries: 100,
+					maxAgeSeconds: 60 * 60,
+				},
+				plugins: [
+					{
+						handlerDidError: async () => {
+							return new Response(JSON.stringify({
+								error: 'offline',
+								message: 'This API is not available offline. Data will sync when online.'
+							}), {
+								status: 503,
+								headers: { 'Content-Type': 'application/json' }
 							});
 						}
 					}
 				]
 			},
 		},
-		// API routes
+
+		// PRIORITY 4: Handle images and assets
 		{
-			urlPattern: /\/api\/.*$/,
-			handler: 'NetworkFirst',
+			urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff|woff2|ttf)$/,
+			handler: 'CacheFirst',
 			options: {
-				cacheName: 'atlas-api',
-				networkTimeoutSeconds: 5,
+				cacheName: 'atlas-assets',
 				expiration: {
 					maxEntries: 100,
-					maxAgeSeconds: 60 * 60, // 1 hour
+					maxAgeSeconds: 30 * 24 * 60 * 60,
 				},
 			},
 		},
-		// Images and static assets
+
+		// PRIORITY 5: Catch-all for any other requests
 		{
-			urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
-			handler: 'CacheFirst',
+			urlPattern: /^https?:\/\/.*/,
+			handler: 'NetworkFirst',
 			options: {
-				cacheName: 'atlas-images',
+				cacheName: 'atlas-general',
+				networkTimeoutSeconds: 3,
 				expiration: {
 					maxEntries: 100,
-					maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+					maxAgeSeconds: 24 * 60 * 60,
 				},
 			},
 		}
 	],
 
-	// ENHANCED: Better offline fallbacks
-	fallbacks: {
-		document: '/offline',
-	},
-
-	// FIXED: Exclude problematic files from precaching
-	buildExcludes: [
-		/middleware-manifest\.json$/,
-		/_buildManifest\.js$/,
-		/_ssgManifest\.js$/,
-		/\.map$/,
-		/^build-manifest\.json$/,
-		/chunks\/.*\.js$/,  // Let runtime caching handle these
-	]
+	// Remove fallbacks since we handle it in the navigation handler
+	// fallbacks: {
+	//     document: '/offline',
+	// },
 });
 
 /** @type {import('next').NextConfig} */
@@ -165,7 +221,7 @@ const nextConfig = {
 		serverComponentsExternalPackages: ['@xenova/transformers'],
 	},
 
-	webpack: (config, { isServer, dev }) => {
+	webpack: (config, { isServer }) => {
 		config.experiments = {
 			...config.experiments,
 			asyncWebAssembly: true,
@@ -183,7 +239,6 @@ const nextConfig = {
 		return config;
 	},
 
-	// ENHANCED: Headers for better PWA caching
 	async headers() {
 		return [
 			{
@@ -208,7 +263,7 @@ const nextConfig = {
 					},
 					{
 						key: 'Cache-Control',
-						value: 'public, max-age=86400, must-revalidate', // 1 day
+						value: 'public, max-age=86400, must-revalidate',
 					},
 				],
 			},
@@ -223,15 +278,10 @@ const nextConfig = {
 						key: 'Cache-Control',
 						value: 'public, max-age=0, must-revalidate',
 					},
-				],
-			},
-			// FIXED: Better caching for static assets
-			{
-				source: '/_next/static/(.*)',
-				headers: [
+					// CRITICAL: Allow service worker to control navigation
 					{
-						key: 'Cache-Control',
-						value: 'public, max-age=31536000, immutable',
+						key: 'Service-Worker-Allowed',
+						value: '/',
 					},
 				],
 			},

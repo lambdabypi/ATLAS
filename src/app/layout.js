@@ -1,4 +1,4 @@
-// src/app/layout.js - FIXED CACHE TIMING
+// src/app/layout.js - ENHANCED Manual Cache with Query Params
 'use client';
 
 import { useEffect } from 'react';
@@ -10,20 +10,19 @@ import '../styles/components.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }) {
-	// FIXED: Manual cache with proper online/offline detection
 	useEffect(() => {
-		const manualCache = async () => {
-			// CRITICAL: Only run if online AND cache available
+		const enhancedManualCache = async () => {
 			if (!('caches' in window) || !navigator.onLine) {
 				console.log('⚠️ Skipping manual cache - offline or not supported');
 				return;
 			}
 
 			try {
-				console.log('🔧 Starting manual cache backup (online)...');
+				console.log('🔧 Starting enhanced manual cache backup (online)...');
 
-				const cache = await caches.open('atlas-manual-v1');
+				const cache = await caches.open('atlas-manual-v2');
 
+				// ENHANCED: Include common query parameter combinations
 				const urlsToCache = [
 					'/',
 					'/dashboard',
@@ -32,6 +31,8 @@ export default function RootLayout({ children }) {
 					'/patients/2',
 					'/consultation',
 					'/consultation/new',
+					'/consultation/new?patientId=1', // ADDED: Your specific failing URL
+					'/consultation/new?patientId=2',
 					'/reference',
 					'/testing'
 				];
@@ -42,7 +43,7 @@ export default function RootLayout({ children }) {
 					try {
 						const fullUrl = window.location.origin + url;
 
-						// FIXED: Check if already cached to avoid unnecessary requests
+						// Check if already cached
 						const cachedResponse = await cache.match(fullUrl);
 						if (cachedResponse) {
 							console.log('✅ Already cached:', url);
@@ -50,47 +51,99 @@ export default function RootLayout({ children }) {
 							continue;
 						}
 
-						await cache.add(new Request(fullUrl));
-						console.log('✅ Manually cached:', url);
-						successCount++;
+						// ENHANCED: Pre-fetch and cache
+						const response = await fetch(fullUrl);
+						if (response.ok) {
+							await cache.put(fullUrl, response);
+							console.log('✅ Manually cached:', url);
+							successCount++;
+						} else {
+							console.warn('⚠️ Bad response for:', url, response.status);
+						}
 					} catch (err) {
 						console.warn('⚠️ Failed to cache:', url, err.message);
 					}
 				}
 
-				console.log(`🎉 Manual caching complete! ${successCount}/${urlsToCache.length} URLs cached`);
+				// CRITICAL: Also cache the current page if it has query params
+				const currentUrl = window.location.href;
+				if (currentUrl.includes('?')) {
+					try {
+						const cachedResponse = await cache.match(currentUrl);
+						if (!cachedResponse) {
+							const response = await fetch(currentUrl);
+							if (response.ok) {
+								await cache.put(currentUrl, response);
+								console.log('✅ Cached current page with params:', currentUrl);
+								successCount++;
+							}
+						}
+					} catch (err) {
+						console.warn('⚠️ Failed to cache current page:', err.message);
+					}
+				}
+
+				console.log(`🎉 Enhanced manual caching complete! ${successCount} URLs cached`);
+
+				// ENHANCED: Also pre-cache in service worker cache
+				if ('serviceWorker' in navigator) {
+					try {
+						const registration = await navigator.serviceWorker.ready;
+						if (registration.active) {
+							registration.active.postMessage({
+								type: 'PRECACHE_URLS',
+								urls: urlsToCache
+							});
+						}
+					} catch (err) {
+						console.warn('⚠️ SW precache message failed:', err.message);
+					}
+				}
 
 			} catch (error) {
-				console.error('❌ Manual cache failed:', error);
+				console.error('❌ Enhanced manual cache failed:', error);
 			}
 		};
 
-		// FIXED: Better online event handling
 		const handleOnline = () => {
-			console.log('🌐 Back online - refreshing caches...');
-			// Wait a moment for connection to stabilize
-			setTimeout(manualCache, 1000);
+			console.log('🌐 Back online - refreshing enhanced caches...');
+			setTimeout(enhancedManualCache, 1000);
 		};
 
 		const handleOffline = () => {
-			console.log('📱 Gone offline - manual cache paused');
+			console.log('📱 Gone offline - enhanced cache paused');
 		};
 
 		// Initial cache only if online
 		if (typeof window !== 'undefined') {
 			if (navigator.onLine) {
 				// Delay initial cache to let page load first
-				setTimeout(manualCache, 2000);
+				setTimeout(enhancedManualCache, 2000);
 			}
 
 			window.addEventListener('online', handleOnline);
 			window.addEventListener('offline', handleOffline);
+
+			// ENHANCED: Cache pages as user navigates
+			const cacheCurrentPageOnNavigation = () => {
+				if (navigator.onLine && 'caches' in window) {
+					caches.open('atlas-manual-v2').then(cache => {
+						cache.put(window.location.href, new Response()).catch(() => {
+							// Silent fail for navigation cache
+						});
+					});
+				}
+			};
+
+			// Cache page on navigation
+			window.addEventListener('beforeunload', cacheCurrentPageOnNavigation);
 		}
 
 		return () => {
 			if (typeof window !== 'undefined') {
 				window.removeEventListener('online', handleOnline);
 				window.removeEventListener('offline', handleOffline);
+				window.removeEventListener('beforeunload', cacheCurrentPageOnNavigation);
 			}
 		};
 	}, []);
