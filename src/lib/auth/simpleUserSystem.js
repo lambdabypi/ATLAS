@@ -1,8 +1,8 @@
-// lib/auth/simpleUserSystem.js - FIXED USER SWITCHING
+// lib/auth/simpleUserSystem.js - FIXED SSR COMPATIBILITY
 /**
  * Simple User Selection System for ATLAS
  * No passwords, just user identification for device sharing
- * SSR-compatible version with FIXED user switching
+ * FULLY SSR-compatible version with NO localStorage access during SSR
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -20,11 +20,11 @@ export const DEFAULT_USERS = [
 	{ id: 'dr_smith', name: 'Dr. Sarah Smith', role: USER_ROLES.DOCTOR, badge: '👩‍⚕️' },
 	{ id: 'nurse_james', name: 'James Ochieng', role: USER_ROLES.NURSE, badge: '👨‍⚕️' },
 	{ id: 'co_mary', name: 'Mary Wanjiku', role: USER_ROLES.CLINICAL_OFFICER, badge: '🩺' },
-	{ id: 'chw_paul', name: 'Paul Kimani', role: USER_ROLES.COMMUNITY_HEALTH_WORKER, badge: '🏥' }
+	{ id: 'chw_paul', name: 'Paul Kimani', role: USER_ROLES.COMMUNITY_HEALTH_WORKER, badge: '🥽' }
 ];
 
 // Check if we're in browser environment
-const isBrowser = () => typeof window !== 'undefined';
+const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 class SimpleUserSystem {
 	constructor() {
@@ -35,7 +35,8 @@ class SimpleUserSystem {
 		this.initialized = false;
 		this.listeners = new Set(); // For state change notifications
 
-		// DON'T call loadFromStorage in constructor for SSR compatibility
+		// ✅ CRITICAL: NO localStorage access in constructor
+		// Initialize will be called from useEffect only
 	}
 
 	// Add listener for state changes
@@ -57,24 +58,26 @@ class SimpleUserSystem {
 
 	// Initialize user system (call from client-side only)
 	initialize() {
+		// ✅ CRITICAL: Double-check we're in browser AND localStorage exists
 		if (this.initialized || !isBrowser()) {
 			return this.currentUser;
 		}
 
 		try {
 			// Load users from localStorage if they exist
-			const savedUsers = localStorage.getItem(this.usersKey);
+			const savedUsers = window.localStorage.getItem(this.usersKey);
 			if (savedUsers) {
 				this.users = JSON.parse(savedUsers);
 			}
 
 			// Check for active session
-			const savedUser = localStorage.getItem(this.storageKey);
+			const savedUser = window.localStorage.getItem(this.storageKey);
 			if (savedUser) {
 				this.currentUser = JSON.parse(savedUser);
 			}
 
 			this.initialized = true;
+			console.log('User system initialized successfully');
 		} catch (error) {
 			console.error('Error initializing user system:', error);
 		}
@@ -101,7 +104,7 @@ class SimpleUserSystem {
 
 		// Save to localStorage
 		try {
-			localStorage.setItem(this.storageKey, JSON.stringify(this.currentUser));
+			window.localStorage.setItem(this.storageKey, JSON.stringify(this.currentUser));
 
 			// Log user activity
 			this.logUserActivity('login', { userId, timestamp: new Date().toISOString() });
@@ -130,7 +133,7 @@ class SimpleUserSystem {
 
 			// Clear current user
 			this.currentUser = null;
-			localStorage.removeItem(this.storageKey);
+			window.localStorage.removeItem(this.storageKey);
 
 			// Notify listeners IMMEDIATELY of the change
 			this.notifyListeners();
@@ -201,7 +204,7 @@ class SimpleUserSystem {
 			[USER_ROLES.DOCTOR]: '👩‍⚕️',
 			[USER_ROLES.NURSE]: '👨‍⚕️',
 			[USER_ROLES.CLINICAL_OFFICER]: '🩺',
-			[USER_ROLES.COMMUNITY_HEALTH_WORKER]: '🏥',
+			[USER_ROLES.COMMUNITY_HEALTH_WORKER]: '🥽',
 			[USER_ROLES.ADMIN]: '⚙️'
 		};
 		return badges[role] || '👤';
@@ -216,7 +219,7 @@ class SimpleUserSystem {
 		if (!isBrowser()) return;
 
 		try {
-			localStorage.setItem(this.usersKey, JSON.stringify(this.users));
+			window.localStorage.setItem(this.usersKey, JSON.stringify(this.users));
 		} catch (error) {
 			console.error('Error saving users:', error);
 		}
@@ -226,7 +229,7 @@ class SimpleUserSystem {
 		if (!isBrowser()) return;
 
 		try {
-			const activityLog = JSON.parse(localStorage.getItem('atlas_user_activity') || '[]');
+			const activityLog = JSON.parse(window.localStorage.getItem('atlas_user_activity') || '[]');
 			activityLog.push({
 				action,
 				...data,
@@ -238,7 +241,7 @@ class SimpleUserSystem {
 				activityLog.splice(0, activityLog.length - 100);
 			}
 
-			localStorage.setItem('atlas_user_activity', JSON.stringify(activityLog));
+			window.localStorage.setItem('atlas_user_activity', JSON.stringify(activityLog));
 		} catch (error) {
 			console.error('Error logging user activity:', error);
 		}
@@ -248,7 +251,7 @@ class SimpleUserSystem {
 		if (!isBrowser()) return [];
 
 		try {
-			return JSON.parse(localStorage.getItem('atlas_user_activity') || '[]');
+			return JSON.parse(window.localStorage.getItem('atlas_user_activity') || '[]');
 		} catch (error) {
 			console.error('Error getting user activity:', error);
 			return [];
@@ -256,18 +259,25 @@ class SimpleUserSystem {
 	}
 }
 
-// Create singleton instance (SSR-safe)
+// ✅ CRITICAL: Create singleton instance but DON'T call initialize()
 export const userSystem = new SimpleUserSystem();
 
-// React hook for using user system - FIXED with proper state updates
+// React hook for using user system - FULLY SSR COMPATIBLE
 export const useUserSystem = () => {
+	// ✅ All state starts with safe defaults
 	const [currentUser, setCurrentUser] = useState(null);
 	const [isInitialized, setIsInitialized] = useState(false);
 	const [forceUpdate, setForceUpdate] = useState(0);
 
-	// Initialize and set up listener
+	// ✅ CRITICAL: Only initialize in useEffect (client-side only)
 	useEffect(() => {
-		if (!isBrowser()) return;
+		// ✅ Double-check we're in browser before doing ANYTHING
+		if (!isBrowser()) {
+			console.log('Server-side render detected, skipping user system initialization');
+			return;
+		}
+
+		console.log('Client-side detected, initializing user system...');
 
 		// Initialize the user system
 		userSystem.initialize();
@@ -282,9 +292,13 @@ export const useUserSystem = () => {
 		});
 
 		return unsubscribe;
-	}, []);
+	}, []); // No dependencies - run once on mount
 
 	const selectUser = useCallback((userId) => {
+		if (!isBrowser()) {
+			console.warn('selectUser called on server-side, ignoring');
+			return null;
+		}
 		console.log('Hook: Selecting user', userId);
 		const user = userSystem.selectUser(userId);
 		// State will be updated via the listener
@@ -292,6 +306,10 @@ export const useUserSystem = () => {
 	}, []);
 
 	const switchUser = useCallback(() => {
+		if (!isBrowser()) {
+			console.warn('switchUser called on server-side, ignoring');
+			return;
+		}
 		console.log('Hook: Switching user');
 		userSystem.switchUser();
 		// State will be updated via the listener

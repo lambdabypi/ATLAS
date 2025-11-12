@@ -1,12 +1,14 @@
-// src/app/page.js - FIXED HOOK ORDER ISSUE
+// src/app/page.js - FULLY SSR COMPATIBLE VERSION
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { initializeEnhancedAtlas } from '../lib/initializeEnhancedAtlas';
-import performanceMonitor from '../lib/monitoring/performanceMonitor';
 import { useUserSystem } from '../lib/auth/simpleUserSystem';
 import { UserSelection } from '../components/auth/UserSelection';
+
+// Import performance monitor lazily to avoid SSR issues
+let performanceMonitor = null;
 
 // Card data moved outside component for better performance
 const cardData = [
@@ -58,6 +60,7 @@ export default function Home() {
 	const [isOnline, setIsOnline] = useState(true); // Default to true for SSR
 	const [initializationError, setInitializationError] = useState(null);
 	const [isInitializing, setIsInitializing] = useState(false);
+	const [isClientSide, setIsClientSide] = useState(false); // Track if we're on client
 
 	// Use ref to prevent double initialization in React StrictMode
 	const hasInitialized = useRef(false);
@@ -65,16 +68,35 @@ export default function Home() {
 	// ✅ ALWAYS call user system hook
 	const { currentUser, isInitialized: userSystemInitialized } = useUserSystem();
 
-	// ✅ ALWAYS call all useEffect hooks
-	// Initialize network status only on client-side
+	// ✅ Client-side detection effect - runs first
 	useEffect(() => {
+		setIsClientSide(true);
+		// Initialize network status only on client-side
 		if (typeof navigator !== 'undefined') {
 			setIsOnline(navigator.onLine);
 		}
 	}, []);
 
+	// ✅ Lazy load performance monitor (client-side only)
+	useEffect(() => {
+		if (!isClientSide) return;
+
+		async function loadPerformanceMonitor() {
+			try {
+				const perfModule = await import('../lib/monitoring/performanceMonitor');
+				performanceMonitor = perfModule.default;
+			} catch (error) {
+				console.warn('Performance monitor not available:', error);
+			}
+		}
+
+		loadPerformanceMonitor();
+	}, [isClientSide]);
+
 	// Main initialization effect
 	useEffect(() => {
+		if (!isClientSide) return; // Don't run on server
+
 		async function initializeApp() {
 			// Prevent double initialization
 			if (hasInitialized.current) {
@@ -87,8 +109,8 @@ export default function Home() {
 				setIsInitializing(true);
 				setInitializationError(null);
 
-				// IMPORTANT: Set the monitor to initialization mode to block AI calls
-				if (performanceMonitor.setInitializing) {
+				// IMPORTANT: Set the monitor to initialization mode to block AI calls (if available)
+				if (performanceMonitor?.setInitializing) {
 					performanceMonitor.setInitializing(true);
 				}
 
@@ -108,8 +130,8 @@ export default function Home() {
 				setInitializationError(error.message);
 			} finally {
 				setIsInitializing(false);
-				// IMPORTANT: Allow AI calls after initialization completes
-				if (performanceMonitor.setInitializing) {
+				// IMPORTANT: Allow AI calls after initialization completes (if available)
+				if (performanceMonitor?.setInitializing) {
 					performanceMonitor.setInitializing(false);
 				}
 			}
@@ -119,39 +141,41 @@ export default function Home() {
 		if (userSystemInitialized && currentUser) {
 			initializeApp();
 		}
+	}, [isClientSide, userSystemInitialized, currentUser]); // Include isClientSide dependency
 
-		// Network status handlers - only add if in browser
-		if (typeof window !== 'undefined') {
-			const handleOnline = () => setIsOnline(true);
-			const handleOffline = () => setIsOnline(false);
+	// Network status handlers - only in browser
+	useEffect(() => {
+		if (!isClientSide) return;
 
-			window.addEventListener('online', handleOnline);
-			window.addEventListener('offline', handleOffline);
+		const handleOnline = () => setIsOnline(true);
+		const handleOffline = () => setIsOnline(false);
 
-			// Service worker registration
-			if ('serviceWorker' in navigator) {
-				window.addEventListener('load', () => {
-					navigator.serviceWorker.register('/service-worker.js').then(
-						(registration) => {
-							console.log('Service Worker registered with scope:', registration.scope);
-						},
-						(err) => {
-							console.log('Service Worker registration failed:', err);
-						}
-					);
-				});
-			}
+		window.addEventListener('online', handleOnline);
+		window.addEventListener('offline', handleOffline);
 
-			return () => {
-				window.removeEventListener('online', handleOnline);
-				window.removeEventListener('offline', handleOffline);
-			};
+		// Service worker registration
+		if ('serviceWorker' in navigator) {
+			window.addEventListener('load', () => {
+				navigator.serviceWorker.register('/service-worker.js').then(
+					(registration) => {
+						console.log('Service Worker registered with scope:', registration.scope);
+					},
+					(err) => {
+						console.log('Service Worker registration failed:', err);
+					}
+				);
+			});
 		}
-	}, [userSystemInitialized, currentUser]); // Depend on user system state
+
+		return () => {
+			window.removeEventListener('online', handleOnline);
+			window.removeEventListener('offline', handleOffline);
+		};
+	}, [isClientSide]);
 
 	// Handle keyboard shortcuts - only in browser
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
+		if (!isClientSide) return;
 
 		const handleKeyPress = (e) => {
 			// Check if Alt key is pressed and it's a letter key
@@ -174,9 +198,27 @@ export default function Home() {
 
 		// Cleanup
 		return () => window.removeEventListener('keydown', handleKeyPress);
-	}, []); // No dependencies needed since cardData is outside component
+	}, [isClientSide]); // Depend on isClientSide
 
-	// ✅ NOW handle conditional rendering in JSX - after all hooks are called
+	// ✅ Handle conditional rendering - SSR safe
+	// Show loading during SSR or initial client hydration
+	if (!isClientSide) {
+		return (
+			<div className="atlas-backdrop">
+				<div className="atlas-page-container">
+					<div className="atlas-content-wrapper">
+						<div className="flex justify-center items-center min-h-64">
+							<div className="text-center">
+								<div className="atlas-spinner mb-4"></div>
+								<span className="text-gray-600">Loading ATLAS...</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
 	// Show user selection if user system is initialized but no user selected
 	if (userSystemInitialized && !currentUser) {
 		return <UserSelection onUserSelected={(user) => {

@@ -9,7 +9,7 @@ import { queuePatientSync } from '../../../lib/sync/patient-sync';
 import { Card, CardHeader, CardContent } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
+import { Select } from '../../../components/ui/Select.jsx';
 import { TextArea } from '../../../components/ui/TextArea';
 
 export default function AddPatientPage() {
