@@ -1,103 +1,158 @@
-// next.config.js - FIXED VERSION (Removes invalid customWorkerPath)
+// next.config.js - ENHANCED for RSC Offline Support
 const withPWA = require('next-pwa')({
 	dest: 'public',
 	register: true,
 	skipWaiting: true,
 	disable: process.env.NODE_ENV === 'development',
 
-	// ENHANCED: Better caching strategies
+	// CRITICAL: Enhanced runtime caching for Next.js RSC
 	runtimeCaching: [
+		// FIXED: Handle Next.js RSC payloads specifically
 		{
-			urlPattern: /^https?.*/, // Match all external resources
-			handler: 'NetworkFirst',
-			options: {
-				cacheName: 'offlineCache',
-				expiration: {
-					maxEntries: 200,
-					maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
-				},
-				networkTimeoutSeconds: 3, // Quick fallback to cache
-			},
-		},
-		{
-			urlPattern: /\/api\/.*/, // API routes
-			handler: 'NetworkFirst',
-			options: {
-				cacheName: 'atlas-api-cache',
-				expiration: {
-					maxEntries: 100,
-					maxAgeSeconds: 24 * 60 * 60, // 1 day
-				},
-				networkTimeoutSeconds: 5,
-			},
-		},
-		{
-			urlPattern: /\/_next\/static\/.*/, // Next.js static assets
+			urlPattern: /\/_next\/static\/chunks\/.*\.js$/,
 			handler: 'CacheFirst',
 			options: {
-				cacheName: 'next-static',
+				cacheName: 'next-chunks',
 				expiration: {
-					maxEntries: 500,
+					maxEntries: 200,
 					maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
 				},
 			},
 		},
 		{
-			urlPattern: /\/dashboard/, // Critical pages
-			handler: 'StaleWhileRevalidate',
+			urlPattern: /\/_next\/static\/.*$/,
+			handler: 'CacheFirst',
+			options: {
+				cacheName: 'next-static-assets',
+				expiration: {
+					maxEntries: 300,
+					maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+				},
+			},
+		},
+		// CRITICAL: RSC payload caching with fallback
+		{
+			urlPattern: /^https:\/\/.*\?.*_rsc=.*$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'next-rsc-payloads',
+				networkTimeoutSeconds: 2, // Quick timeout
+				expiration: {
+					maxEntries: 100,
+					maxAgeSeconds: 24 * 60 * 60, // 1 day
+				},
+				plugins: [
+					{
+						// FIXED: Custom RSC fallback
+						handlerDidError: async () => {
+							// Return minimal RSC response that won't break Next.js
+							return new Response('null', {
+								status: 200,
+								headers: {
+									'Content-Type': 'text/x-component',
+									'Cache-Control': 'no-cache'
+								}
+							});
+						},
+					},
+				],
+			},
+		},
+		// Navigation requests (pages)
+		{
+			urlPattern: /^https:\/\/.*\/(?:dashboard|patients|consultation|reference|testing)(?:\/.*)?$/,
+			handler: 'NetworkFirst',
 			options: {
 				cacheName: 'atlas-pages',
+				networkTimeoutSeconds: 3,
 				expiration: {
 					maxEntries: 50,
-					maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+					maxAgeSeconds: 24 * 60 * 60, // 1 day
+				},
+				plugins: [
+					{
+						// FIXED: Page fallback with error handling
+						handlerDidError: async ({ request }) => {
+							const cache = await caches.open('atlas-pages');
+							// Try to find any cached page as fallback
+							const cachedResponse = await cache.match(request) ||
+								await cache.match('/dashboard') ||
+								await cache.match('/');
+							if (cachedResponse) {
+								return cachedResponse;
+							}
+							// Final fallback - return offline page or basic HTML
+							return new Response(`
+                                <!DOCTYPE html>
+                                <html>
+                                <head><title>ATLAS - Offline</title></head>
+                                <body>
+                                    <h1>🏥 ATLAS Offline</h1>
+                                    <p>You're offline. Core features are still available.</p>
+                                    <script>
+                                        if ('serviceWorker' in navigator) {
+                                            // Try to reload when back online
+                                            navigator.serviceWorker.addEventListener('message', e => {
+                                                if (e.data.type === 'BACK_ONLINE') {
+                                                    window.location.reload();
+                                                }
+                                            });
+                                        }
+                                        
+                                        window.addEventListener('online', () => {
+                                            window.location.reload();
+                                        });
+                                    </script>
+                                </body>
+                                </html>
+                            `, {
+								headers: { 'Content-Type': 'text/html' }
+							});
+						}
+					}
+				]
+			},
+		},
+		// API routes
+		{
+			urlPattern: /\/api\/.*$/,
+			handler: 'NetworkFirst',
+			options: {
+				cacheName: 'atlas-api',
+				networkTimeoutSeconds: 5,
+				expiration: {
+					maxEntries: 100,
+					maxAgeSeconds: 60 * 60, // 1 hour
 				},
 			},
 		},
+		// Images and static assets
 		{
-			urlPattern: /\/patients\/.*/, // Dynamic patient pages
-			handler: 'NetworkFirst',
+			urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
+			handler: 'CacheFirst',
 			options: {
-				cacheName: 'patient-pages',
+				cacheName: 'atlas-images',
 				expiration: {
 					maxEntries: 100,
-					maxAgeSeconds: 24 * 60 * 60, // 1 day
+					maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
 				},
-				networkTimeoutSeconds: 3,
-			},
-		},
-		{
-			urlPattern: /\/consultation\/.*/, // Consultation pages
-			handler: 'NetworkFirst',
-			options: {
-				cacheName: 'consultation-pages',
-				expiration: {
-					maxEntries: 100,
-					maxAgeSeconds: 24 * 60 * 60, // 1 day
-				},
-				networkTimeoutSeconds: 3,
 			},
 		}
 	],
 
-	// ENHANCED: Better offline fallbacks (FIXED - removed invalid options)
+	// ENHANCED: Better offline fallbacks
 	fallbacks: {
 		document: '/offline',
-		// Note: Only add these if you have the actual files
-		// image: '/icons/offline-fallback.png',
-		// audio: '/audio/offline-message.mp3', 
-		// video: '/video/offline-placeholder.mp4',
-		// font: '/fonts/fallback-font.woff2'
 	},
 
-	// REMOVED: customWorkerPath - not valid for GenerateSW strategy
-
-	// PWA configuration for better offline experience
+	// FIXED: Exclude problematic files from precaching
 	buildExcludes: [
 		/middleware-manifest\.json$/,
 		/_buildManifest\.js$/,
 		/_ssgManifest\.js$/,
 		/\.map$/,
-		/^build-manifest\.json$/
+		/^build-manifest\.json$/,
+		/chunks\/.*\.js$/,  // Let runtime caching handle these
 	]
 });
 
@@ -106,18 +161,11 @@ const nextConfig = {
 	reactStrictMode: true,
 	swcMinify: true,
 
-	// Essential for offline-first apps
-	trailingSlash: false,
-
 	experimental: {
 		serverComponentsExternalPackages: ['@xenova/transformers'],
-		// Better offline handling
-		workerThreads: false,
-		cpus: 1
 	},
 
 	webpack: (config, { isServer, dev }) => {
-		// Enhanced webpack optimizations for offline
 		config.experiments = {
 			...config.experiments,
 			asyncWebAssembly: true,
@@ -129,41 +177,13 @@ const nextConfig = {
 				fs: false,
 				path: false,
 				crypto: false,
-				stream: false,
-				buffer: false,
-			};
-
-			// Optimize for offline loading
-			config.optimization = {
-				...config.optimization,
-				splitChunks: {
-					...config.optimization.splitChunks,
-					cacheGroups: {
-						default: false,
-						vendors: false,
-						// Critical vendor bundle
-						vendor: {
-							chunks: 'all',
-							name: 'vendor',
-							test: /[\\/]node_modules[\\/]/,
-							enforce: true
-						},
-						// Atlas-specific bundle
-						atlas: {
-							chunks: 'all',
-							name: 'atlas-core',
-							test: /[\\/]src[\\/](lib|components)[\\/]/,
-							enforce: true,
-							priority: 10
-						}
-					}
-				}
 			};
 		}
 
 		return config;
 	},
 
+	// ENHANCED: Headers for better PWA caching
 	async headers() {
 		return [
 			{
@@ -188,7 +208,7 @@ const nextConfig = {
 					},
 					{
 						key: 'Cache-Control',
-						value: 'public, max-age=0, must-revalidate',
+						value: 'public, max-age=86400, must-revalidate', // 1 day
 					},
 				],
 			},
@@ -200,12 +220,18 @@ const nextConfig = {
 						value: 'application/javascript',
 					},
 					{
-						key: 'Service-Worker-Allowed',
-						value: '/',
-					},
-					{
 						key: 'Cache-Control',
 						value: 'public, max-age=0, must-revalidate',
+					},
+				],
+			},
+			// FIXED: Better caching for static assets
+			{
+				source: '/_next/static/(.*)',
+				headers: [
+					{
+						key: 'Cache-Control',
+						value: 'public, max-age=31536000, immutable',
 					},
 				],
 			},

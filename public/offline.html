@@ -1,4 +1,4 @@
-<!-- public/offline.html - Enhanced offline experience -->
+<!-- public/offline.html - ENHANCED with Reload Support -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -45,12 +45,21 @@
 			font-size: 2rem;
 			font-weight: bold;
 			color: white;
+			animation: pulse 2s infinite;
 		}
 
-		.offline-icon {
-			font-size: 4rem;
-			margin-bottom: 1.5rem;
-			opacity: 0.8;
+		@keyframes pulse {
+
+			0%,
+			100% {
+				opacity: 1;
+				transform: scale(1);
+			}
+
+			50% {
+				opacity: 0.8;
+				transform: scale(0.95);
+			}
 		}
 
 		h1 {
@@ -65,8 +74,22 @@
 			line-height: 1.6;
 		}
 
-		.offline-features {
-			background: #f7fafc;
+		.reload-info {
+			background: #fef3c7;
+			border: 1px solid #f59e0b;
+			border-radius: 12px;
+			padding: 1rem;
+			margin: 2rem 0;
+			color: #92400e;
+		}
+
+		.reload-info strong {
+			display: block;
+			margin-bottom: 0.5rem;
+		}
+
+		.available-features {
+			background: #f0f9ff;
 			border-radius: 12px;
 			padding: 1.5rem;
 			margin: 2rem 0;
@@ -81,7 +104,7 @@
 			display: flex;
 			align-items: center;
 			margin-bottom: 0.75rem;
-			color: #2d3748;
+			color: #1e40af;
 		}
 
 		.feature-list li:before {
@@ -90,17 +113,26 @@
 			font-size: 1.2rem;
 		}
 
+		.button-group {
+			display: flex;
+			gap: 1rem;
+			flex-wrap: wrap;
+			justify-content: center;
+			margin: 2rem 0;
+		}
+
 		.retry-button {
 			background: linear-gradient(135deg, #667eea, #764ba2);
 			color: white;
 			border: none;
 			padding: 1rem 2rem;
 			border-radius: 12px;
-			font-size: 1.1rem;
+			font-size: 1rem;
 			font-weight: 600;
 			cursor: pointer;
 			transition: transform 0.2s, box-shadow 0.2s;
-			margin-right: 1rem;
+			flex: 1;
+			min-width: 140px;
 		}
 
 		.retry-button:hover {
@@ -108,7 +140,13 @@
 			box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
 		}
 
-		.cache-button {
+		.retry-button:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+			transform: none;
+		}
+
+		.dashboard-button {
 			background: transparent;
 			color: #667eea;
 			border: 2px solid #667eea;
@@ -117,9 +155,13 @@
 			font-size: 1rem;
 			cursor: pointer;
 			transition: all 0.2s;
+			text-decoration: none;
+			display: inline-block;
+			flex: 1;
+			min-width: 140px;
 		}
 
-		.cache-button:hover {
+		.dashboard-button:hover {
 			background: #667eea;
 			color: white;
 		}
@@ -141,43 +183,14 @@
 			color: #2f855a;
 		}
 
-		.pulse {
-			animation: pulse 2s infinite;
-		}
-
-		@keyframes pulse {
-
-			0%,
-			100% {
-				opacity: 1;
-			}
-
-			50% {
-				opacity: 0.5;
-			}
-		}
-
-		.quick-actions {
+		.debug-info {
 			margin-top: 2rem;
-			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-			gap: 1rem;
-		}
-
-		.quick-action {
 			padding: 1rem;
 			background: #f7fafc;
-			border: 1px solid #e2e8f0;
 			border-radius: 8px;
-			text-decoration: none;
+			font-size: 0.8rem;
 			color: #4a5568;
-			transition: all 0.2s;
-			font-size: 0.9rem;
-		}
-
-		.quick-action:hover {
-			background: #edf2f7;
-			transform: translateY(-1px);
+			text-align: left;
 		}
 
 		@media (max-width: 640px) {
@@ -185,14 +198,14 @@
 				padding: 2rem 1.5rem;
 			}
 
-			.retry-button {
-				width: 100%;
-				margin-bottom: 1rem;
-				margin-right: 0;
+			.button-group {
+				flex-direction: column;
 			}
 
-			.cache-button {
+			.retry-button,
+			.dashboard-button {
 				width: 100%;
+				flex: none;
 			}
 		}
 	</style>
@@ -200,9 +213,7 @@
 
 <body>
 	<div class="offline-container">
-		<div class="atlas-logo pulse">A</div>
-
-		<div class="offline-icon">🏥</div>
+		<div class="atlas-logo">A</div>
 
 		<h1>ATLAS Offline Mode</h1>
 
@@ -211,57 +222,78 @@
 			local intelligence.
 		</p>
 
-		<div class="offline-features">
-			<h3 style="margin-bottom: 1rem; color: #2d3748;">Available Features:</h3>
+		<div class="reload-info" id="reloadInfo" style="display: none;">
+			<strong>Page Reload Detected</strong>
+			Some features may be limited due to offline reload. Try the dashboard link below for full offline
+			functionality.
+		</div>
+
+		<div class="available-features">
+			<h3 style="margin-bottom: 1rem; color: #1e40af;">Available Features:</h3>
 			<ul class="feature-list">
-				<li>View cached patient records</li>
-				<li>Access clinical guidelines</li>
+				<li>Access cached patient records</li>
+				<li>View clinical guidelines</li>
 				<li>Create offline consultations</li>
 				<li>Use local AI decision support</li>
 				<li>Browse reference materials</li>
 			</ul>
 		</div>
 
-		<div style="margin-bottom: 2rem;">
-			<button class="retry-button" onclick="retryConnection()">
+		<div class="button-group">
+			<button class="retry-button" onclick="retryConnection()" id="retryBtn">
 				🔄 Retry Connection
 			</button>
-			<button class="cache-button" onclick="showCacheInfo()">
-				📦 Cache Status
-			</button>
-		</div>
-
-		<div class="quick-actions">
-			<a href="/dashboard" class="quick-action">
-				📊<br>Dashboard
-			</a>
-			<a href="/patients" class="quick-action">
-				👤<br>Patients
-			</a>
-			<a href="/consultation" class="quick-action">
-				⚡<br>Consult
-			</a>
-			<a href="/reference" class="quick-action">
-				📚<br>Reference
+			<a href="/dashboard" class="dashboard-button">
+				📊 Go to Dashboard
 			</a>
 		</div>
 
 		<div class="network-status offline" id="networkStatus">
 			📡 Offline Mode - Will sync when connection is restored
 		</div>
+
+		<div class="debug-info" id="debugInfo">
+			<strong>Debug Info:</strong><br>
+			URL: <span id="currentUrl"></span><br>
+			Referrer: <span id="referrerInfo"></span><br>
+			Cache Available: <span id="cacheStatus"></span>
+		</div>
 	</div>
 
 	<script>
+		// ENHANCED: Better reload detection and handling
+		function initializeOfflinePage() {
+			// Debug info
+			document.getElementById('currentUrl').textContent = window.location.href;
+			document.getElementById('referrerInfo').textContent = document.referrer || 'Direct access';
+			document.getElementById('cacheStatus').textContent = 'caches' in window ? 'Yes' : 'No';
+
+			// Detect if this was a reload while offline
+			const wasReload = document.referrer === window.location.href ||
+				sessionStorage.getItem('atlas_offline_reload') === 'true';
+
+			if (wasReload) {
+				document.getElementById('reloadInfo').style.display = 'block';
+				sessionStorage.setItem('atlas_offline_reload', 'true');
+			}
+		}
+
 		// Network status monitoring
 		function updateNetworkStatus() {
 			const status = document.getElementById('networkStatus');
+			const retryBtn = document.getElementById('retryBtn');
+
 			if (navigator.onLine) {
 				status.className = 'network-status online';
 				status.innerHTML = '🌐 Connection restored - Ready to sync';
+				retryBtn.disabled = false;
+
+				// Clear reload flag
+				sessionStorage.removeItem('atlas_offline_reload');
 
 				// Auto-reload when back online
 				setTimeout(() => {
-					window.location.reload();
+					window.location.href = '/dashboard';
 				}, 2000);
 			} else {
 				status.className = 'network-status offline';
@@ -269,91 +301,91 @@
 			}
 		}
 
-		// Retry connection
+		// Retry connection with better error handling
 		function retryConnection() {
-			const button = document.querySelector('.retry-button');
+			const button = document.getElementById('retryBtn');
 			button.innerHTML = '🔄 Checking...';
 			button.disabled = true;
 
-			// Simple connectivity test
-			fetch('/', { cache: 'no-cache' })
-				.then(() => {
-					button.innerHTML = '✅ Connected!';
-					setTimeout(() => {
-						window.location.reload();
-					}, 1000);
+			// Test multiple endpoints
+			const testEndpoints = [
+				window.location.origin + '/',
+				window.location.origin + '/dashboard',
+				'https://www.google.com/favicon.ico'
+			];
+
+			Promise.race(testEndpoints.map(url =>
+				fetch(url, {
+					method: 'HEAD',
+					mode: 'no-cors',
+					cache: 'no-cache',
+					signal: AbortSignal.timeout(3000)
 				})
-				.catch(() => {
-					button.innerHTML = '❌ Still Offline';
-					setTimeout(() => {
-						button.innerHTML = '🔄 Retry Connection';
-						button.disabled = false;
-					}, 2000);
-				});
-		}
-
-		// Show cache information
-		async function showCacheInfo() {
-			const button = document.querySelector('.cache-button');
-
-			if ('caches' in window) {
-				try {
-					const cacheNames = await caches.keys();
-					let totalEntries = 0;
-
-					for (const cacheName of cacheNames) {
-						const cache = await caches.open(cacheName);
-						const keys = await cache.keys();
-						totalEntries += keys.length;
-					}
-
-					button.innerHTML = `📦 ${cacheNames.length} caches, ${totalEntries} items`;
-
-					setTimeout(() => {
-						button.innerHTML = '📦 Cache Status';
-					}, 3000);
-
-				} catch (error) {
-					button.innerHTML = '❌ Cache unavailable';
-					setTimeout(() => {
-						button.innerHTML = '📦 Cache Status';
-					}, 2000);
-				}
-			} else {
-				button.innerHTML = '❌ Not supported';
+			)).then(() => {
+				button.innerHTML = '✅ Connected!';
+				sessionStorage.removeItem('atlas_offline_reload');
 				setTimeout(() => {
-					button.innerHTML = '📦 Cache Status';
+					window.location.href = '/dashboard';
+				}, 1000);
+			}).catch(() => {
+				button.innerHTML = '❌ Still Offline';
+				setTimeout(() => {
+					button.innerHTML = '🔄 Retry Connection';
+					button.disabled = false;
 				}, 2000);
-			}
+			});
 		}
 
-		// Initialize
+		// FIXED: Service Worker communication for better offline handling
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.ready.then(reg => {
+				console.log('SW ready, requesting cache status...');
+
+				// Request cache status from service worker
+				if (reg.active) {
+					const channel = new MessageChannel();
+					channel.port1.onmessage = (event) => {
+						console.log('SW cache status:', event.data);
+					};
+					reg.active.postMessage({
+						type: 'GET_CACHE_STATUS'
+					}, [channel.port2]);
+				}
+			});
+		}
+
+		// Initialize page
+		initializeOfflinePage();
 		updateNetworkStatus();
+
+		// Event listeners
 		window.addEventListener('online', updateNetworkStatus);
 		window.addEventListener('offline', updateNetworkStatus);
+
+		// Auto-retry every 30 seconds when offline
+		setInterval(() => {
+			if (!navigator.onLine) {
+				fetch(window.location.origin, {
+					method: 'HEAD',
+					cache: 'no-cache',
+					signal: AbortSignal.timeout(2000)
+				}).then(() => {
+					updateNetworkStatus();
+				}).catch(() => {
+					// Still offline - do nothing
+				});
+			}
+		}, 30000);
 
 		// Keyboard shortcuts
 		document.addEventListener('keydown', (e) => {
 			if (e.altKey && !e.ctrlKey && !e.metaKey) {
 				switch (e.key.toLowerCase()) {
 					case 'd': window.location.href = '/dashboard'; break;
-					case 'p': window.location.href = '/patients'; break;
-					case 'c': window.location.href = '/consultation'; break;
-					case 'r': window.location.href = '/reference'; break;
+					case 'r': retryConnection(); break;
 				}
 			}
 		});
-
-		// Auto-retry every 30 seconds when offline
-		setInterval(() => {
-			if (!navigator.onLine) {
-				fetch('/', { cache: 'no-cache' }).then(() => {
-					updateNetworkStatus();
-				}).catch(() => {
-					// Still offline
-				});
-			}
-		}, 30000);
 	</script>
 </body>
 

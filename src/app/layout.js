@@ -1,4 +1,4 @@
-// src/app/layout.js
+// src/app/layout.js - FIXED CACHE TIMING
 'use client';
 
 import { useEffect } from 'react';
@@ -10,60 +10,87 @@ import '../styles/components.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }) {
-	// Manual cache fallback effect
+	// FIXED: Manual cache with proper online/offline detection
 	useEffect(() => {
 		const manualCache = async () => {
-			if ('caches' in window && navigator.onLine) {
-				try {
-					console.log('🔧 Starting manual cache backup...');
+			// CRITICAL: Only run if online AND cache available
+			if (!('caches' in window) || !navigator.onLine) {
+				console.log('⚠️ Skipping manual cache - offline or not supported');
+				return;
+			}
 
-					const cache = await caches.open('atlas-manual-v1');
+			try {
+				console.log('🔧 Starting manual cache backup (online)...');
 
-					const urlsToCache = [
-						'/',
-						'/dashboard',
-						'/patients',
-						'/patients/1',
-						'/patients/2',
-						'/consultation',
-						'/consultation/new',
-						'/reference',
-						'/testing'
-					];
+				const cache = await caches.open('atlas-manual-v1');
 
-					for (const url of urlsToCache) {
-						try {
-							const fullUrl = window.location.origin + url;
-							await cache.add(new Request(fullUrl));
-							console.log('✅ Manually cached:', url);
-						} catch (err) {
-							console.warn('⚠️ Failed to cache:', url, err.message);
+				const urlsToCache = [
+					'/',
+					'/dashboard',
+					'/patients',
+					'/patients/1',
+					'/patients/2',
+					'/consultation',
+					'/consultation/new',
+					'/reference',
+					'/testing'
+				];
+
+				let successCount = 0;
+
+				for (const url of urlsToCache) {
+					try {
+						const fullUrl = window.location.origin + url;
+
+						// FIXED: Check if already cached to avoid unnecessary requests
+						const cachedResponse = await cache.match(fullUrl);
+						if (cachedResponse) {
+							console.log('✅ Already cached:', url);
+							successCount++;
+							continue;
 						}
+
+						await cache.add(new Request(fullUrl));
+						console.log('✅ Manually cached:', url);
+						successCount++;
+					} catch (err) {
+						console.warn('⚠️ Failed to cache:', url, err.message);
 					}
-
-					console.log('🎉 Manual caching complete!');
-
-				} catch (error) {
-					console.error('❌ Manual cache failed:', error);
 				}
+
+				console.log(`🎉 Manual caching complete! ${successCount}/${urlsToCache.length} URLs cached`);
+
+			} catch (error) {
+				console.error('❌ Manual cache failed:', error);
 			}
 		};
 
-		// Cache on load and when online
+		// FIXED: Better online event handling
 		const handleOnline = () => {
 			console.log('🌐 Back online - refreshing caches...');
-			manualCache();
+			// Wait a moment for connection to stabilize
+			setTimeout(manualCache, 1000);
 		};
 
-		// Initial cache
+		const handleOffline = () => {
+			console.log('📱 Gone offline - manual cache paused');
+		};
+
+		// Initial cache only if online
 		if (typeof window !== 'undefined') {
-			manualCache();
+			if (navigator.onLine) {
+				// Delay initial cache to let page load first
+				setTimeout(manualCache, 2000);
+			}
+
 			window.addEventListener('online', handleOnline);
+			window.addEventListener('offline', handleOffline);
 		}
 
 		return () => {
 			if (typeof window !== 'undefined') {
 				window.removeEventListener('online', handleOnline);
+				window.removeEventListener('offline', handleOffline);
 			}
 		};
 	}, []);
