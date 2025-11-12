@@ -1,76 +1,359 @@
+<!-- public/offline.html - Enhanced offline experience -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>ATLAS - Offline</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ATLAS - Offline Mode</title>
 	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			color: white;
-			margin: 0;
 			min-height: 100vh;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			padding: 2rem;
+			color: #333;
 		}
 
-		.container {
+		.offline-container {
+			background: white;
+			border-radius: 20px;
+			padding: 3rem;
 			text-align: center;
-			max-width: 400px;
-			background: rgba(255, 255, 255, 0.1);
-			padding: 2rem;
-			border-radius: 16px;
-			backdrop-filter: blur(10px);
+			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+			max-width: 500px;
+			width: 90%;
 		}
 
-		.icon {
-			font-size: 3rem;
-			margin-bottom: 1rem;
+		.atlas-logo {
+			width: 80px;
+			height: 80px;
+			background: linear-gradient(135deg, #667eea, #764ba2);
+			border-radius: 20px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin: 0 auto 2rem;
+			font-size: 2rem;
+			font-weight: bold;
+			color: white;
+		}
+
+		.offline-icon {
+			font-size: 4rem;
+			margin-bottom: 1.5rem;
+			opacity: 0.8;
 		}
 
 		h1 {
-			font-size: 2rem;
+			color: #1a202c;
 			margin-bottom: 1rem;
+			font-size: 2rem;
 		}
 
-		p {
-			margin-bottom: 1.5rem;
-			opacity: 0.9;
+		.status-message {
+			color: #4a5568;
+			margin-bottom: 2rem;
+			line-height: 1.6;
 		}
 
-		.retry-btn {
-			background: rgba(255, 255, 255, 0.2);
+		.offline-features {
+			background: #f7fafc;
+			border-radius: 12px;
+			padding: 1.5rem;
+			margin: 2rem 0;
+			text-align: left;
+		}
+
+		.feature-list {
+			list-style: none;
+		}
+
+		.feature-list li {
+			display: flex;
+			align-items: center;
+			margin-bottom: 0.75rem;
+			color: #2d3748;
+		}
+
+		.feature-list li:before {
+			content: "✅";
+			margin-right: 0.75rem;
+			font-size: 1.2rem;
+		}
+
+		.retry-button {
+			background: linear-gradient(135deg, #667eea, #764ba2);
 			color: white;
-			border: 2px solid rgba(255, 255, 255, 0.3);
-			padding: 0.75rem 1.5rem;
-			border-radius: 8px;
+			border: none;
+			padding: 1rem 2rem;
+			border-radius: 12px;
+			font-size: 1.1rem;
+			font-weight: 600;
 			cursor: pointer;
-			font-size: 1rem;
+			transition: transform 0.2s, box-shadow 0.2s;
+			margin-right: 1rem;
 		}
 
-		.retry-btn:hover {
-			background: rgba(255, 255, 255, 0.3);
+		.retry-button:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+		}
+
+		.cache-button {
+			background: transparent;
+			color: #667eea;
+			border: 2px solid #667eea;
+			padding: 1rem 2rem;
+			border-radius: 12px;
+			font-size: 1rem;
+			cursor: pointer;
+			transition: all 0.2s;
+		}
+
+		.cache-button:hover {
+			background: #667eea;
+			color: white;
+		}
+
+		.network-status {
+			margin-top: 2rem;
+			padding: 1rem;
+			border-radius: 8px;
+			font-size: 0.9rem;
+		}
+
+		.network-status.offline {
+			background: #fed7d7;
+			color: #c53030;
+		}
+
+		.network-status.online {
+			background: #c6f6d5;
+			color: #2f855a;
+		}
+
+		.pulse {
+			animation: pulse 2s infinite;
+		}
+
+		@keyframes pulse {
+
+			0%,
+			100% {
+				opacity: 1;
+			}
+
+			50% {
+				opacity: 0.5;
+			}
+		}
+
+		.quick-actions {
+			margin-top: 2rem;
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			gap: 1rem;
+		}
+
+		.quick-action {
+			padding: 1rem;
+			background: #f7fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 8px;
+			text-decoration: none;
+			color: #4a5568;
+			transition: all 0.2s;
+			font-size: 0.9rem;
+		}
+
+		.quick-action:hover {
+			background: #edf2f7;
+			transform: translateY(-1px);
+		}
+
+		@media (max-width: 640px) {
+			.offline-container {
+				padding: 2rem 1.5rem;
+			}
+
+			.retry-button {
+				width: 100%;
+				margin-bottom: 1rem;
+				margin-right: 0;
+			}
+
+			.cache-button {
+				width: 100%;
+			}
 		}
 	</style>
 </head>
 
 <body>
-	<div class="container">
-		<div class="icon">🏥</div>
-		<h1>ATLAS</h1>
-		<p>You're offline, but cached content is available.</p>
-		<button class="retry-btn" onclick="window.location.reload()">
-			Try Again
-		</button>
+	<div class="offline-container">
+		<div class="atlas-logo pulse">A</div>
+
+		<div class="offline-icon">🏥</div>
+
+		<h1>ATLAS Offline Mode</h1>
+
+		<p class="status-message">
+			You're currently offline, but ATLAS continues to provide essential clinical support using cached data and
+			local intelligence.
+		</p>
+
+		<div class="offline-features">
+			<h3 style="margin-bottom: 1rem; color: #2d3748;">Available Features:</h3>
+			<ul class="feature-list">
+				<li>View cached patient records</li>
+				<li>Access clinical guidelines</li>
+				<li>Create offline consultations</li>
+				<li>Use local AI decision support</li>
+				<li>Browse reference materials</li>
+			</ul>
+		</div>
+
+		<div style="margin-bottom: 2rem;">
+			<button class="retry-button" onclick="retryConnection()">
+				🔄 Retry Connection
+			</button>
+			<button class="cache-button" onclick="showCacheInfo()">
+				📦 Cache Status
+			</button>
+		</div>
+
+		<div class="quick-actions">
+			<a href="/dashboard" class="quick-action">
+				📊<br>Dashboard
+			</a>
+			<a href="/patients" class="quick-action">
+				👤<br>Patients
+			</a>
+			<a href="/consultation" class="quick-action">
+				⚡<br>Consult
+			</a>
+			<a href="/reference" class="quick-action">
+				📚<br>Reference
+			</a>
+		</div>
+
+		<div class="network-status offline" id="networkStatus">
+			📡 Offline Mode - Will sync when connection is restored
+		</div>
 	</div>
+
 	<script>
-		window.addEventListener('online', () => {
-			window.location.reload();
+		// Network status monitoring
+		function updateNetworkStatus() {
+			const status = document.getElementById('networkStatus');
+			if (navigator.onLine) {
+				status.className = 'network-status online';
+				status.innerHTML = '🌐 Connection restored - Ready to sync';
+
+				// Auto-reload when back online
+				setTimeout(() => {
+					window.location.reload();
+				}, 2000);
+			} else {
+				status.className = 'network-status offline';
+				status.innerHTML = '📡 Offline Mode - Will sync when connection is restored';
+			}
+		}
+
+		// Retry connection
+		function retryConnection() {
+			const button = document.querySelector('.retry-button');
+			button.innerHTML = '🔄 Checking...';
+			button.disabled = true;
+
+			// Simple connectivity test
+			fetch('/', { cache: 'no-cache' })
+				.then(() => {
+					button.innerHTML = '✅ Connected!';
+					setTimeout(() => {
+						window.location.reload();
+					}, 1000);
+				})
+				.catch(() => {
+					button.innerHTML = '❌ Still Offline';
+					setTimeout(() => {
+						button.innerHTML = '🔄 Retry Connection';
+						button.disabled = false;
+					}, 2000);
+				});
+		}
+
+		// Show cache information
+		async function showCacheInfo() {
+			const button = document.querySelector('.cache-button');
+
+			if ('caches' in window) {
+				try {
+					const cacheNames = await caches.keys();
+					let totalEntries = 0;
+
+					for (const cacheName of cacheNames) {
+						const cache = await caches.open(cacheName);
+						const keys = await cache.keys();
+						totalEntries += keys.length;
+					}
+
+					button.innerHTML = `📦 ${cacheNames.length} caches, ${totalEntries} items`;
+
+					setTimeout(() => {
+						button.innerHTML = '📦 Cache Status';
+					}, 3000);
+
+				} catch (error) {
+					button.innerHTML = '❌ Cache unavailable';
+					setTimeout(() => {
+						button.innerHTML = '📦 Cache Status';
+					}, 2000);
+				}
+			} else {
+				button.innerHTML = '❌ Not supported';
+				setTimeout(() => {
+					button.innerHTML = '📦 Cache Status';
+				}, 2000);
+			}
+		}
+
+		// Initialize
+		updateNetworkStatus();
+		window.addEventListener('online', updateNetworkStatus);
+		window.addEventListener('offline', updateNetworkStatus);
+
+		// Keyboard shortcuts
+		document.addEventListener('keydown', (e) => {
+			if (e.altKey && !e.ctrlKey && !e.metaKey) {
+				switch (e.key.toLowerCase()) {
+					case 'd': window.location.href = '/dashboard'; break;
+					case 'p': window.location.href = '/patients'; break;
+					case 'c': window.location.href = '/consultation'; break;
+					case 'r': window.location.href = '/reference'; break;
+				}
+			}
 		});
+
+		// Auto-retry every 30 seconds when offline
+		setInterval(() => {
+			if (!navigator.onLine) {
+				fetch('/', { cache: 'no-cache' }).then(() => {
+					updateNetworkStatus();
+				}).catch(() => {
+					// Still offline
+				});
+			}
+		}, 30000);
 	</script>
 </body>
 
