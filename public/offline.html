@@ -1,98 +1,132 @@
-<!-- public/offline.html -->
+const offlineHtml = `
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Offline - Clinical Support</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>ATLAS - Offline</title>
 	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
 		body {
-			font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-			background-color: #f3f4f6;
-			color: #1f2937;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: white;
+			min-height: 100vh;
 			display: flex;
-			flex-direction: column;
 			align-items: center;
 			justify-content: center;
-			min-height: 100vh;
-			margin: 0;
-			padding: 20px;
-			text-align: center;
+			padding: 2rem;
 		}
 
 		.container {
-			max-width: 600px;
-			background-color: white;
-			border-radius: 8px;
-			padding: 30px;
-			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-		}
-
-		h1 {
-			color: #2563eb;
-			margin-bottom: 16px;
-		}
-
-		p {
-			margin-bottom: 24px;
-			line-height: 1.6;
+			text-align: center;
+			max-width: 500px;
+			background: rgba(255, 255, 255, 0.1);
+			padding: 3rem 2rem;
+			border-radius: 16px;
+			backdrop-filter: blur(10px);
+			border: 1px solid rgba(255, 255, 255, 0.2);
 		}
 
 		.icon {
-			width: 80px;
-			height: 80px;
-			margin-bottom: 20px;
+			font-size: 4rem;
+			margin-bottom: 1.5rem;
+			animation: pulse 2s infinite;
 		}
 
-		.button {
-			background-color: #2563eb;
+		@keyframes pulse {
+
+			0%,
+			100% {
+				transform: scale(1);
+				opacity: 1;
+			}
+
+			50% {
+				transform: scale(1.1);
+				opacity: 0.8;
+			}
+		}
+
+		h1 {
+			font-size: 2.5rem;
+			margin-bottom: 1rem;
+			font-weight: 700;
+		}
+
+		p {
+			font-size: 1.1rem;
+			margin-bottom: 2rem;
+			opacity: 0.9;
+			line-height: 1.5;
+		}
+
+		.status {
+			background: rgba(255, 255, 255, 0.2);
+			padding: 1rem;
+			border-radius: 8px;
+			margin: 2rem 0;
+			border: 1px solid rgba(255, 255, 255, 0.3);
+		}
+
+		.retry-btn {
+			background: rgba(255, 255, 255, 0.2);
 			color: white;
-			padding: 12px 24px;
-			border-radius: 6px;
-			text-decoration: none;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			padding: 0.75rem 2rem;
+			border-radius: 8px;
+			cursor: pointer;
+			font-size: 1rem;
 			font-weight: 500;
-			display: inline-block;
-			margin-top: 20px;
+			transition: all 0.3s ease;
+		}
+
+		.retry-btn:hover {
+			background: rgba(255, 255, 255, 0.3);
+			border-color: rgba(255, 255, 255, 0.5);
+			transform: translateY(-2px);
 		}
 
 		.features {
-			display: grid;
-			grid-template-columns: 1fr;
-			gap: 16px;
-			margin-top: 30px;
 			text-align: left;
+			margin: 2rem 0;
 		}
 
-		.feature {
-			display: flex;
-			align-items: flex-start;
-			gap: 12px;
+		.features ul {
+			list-style: none;
+			padding: 0;
 		}
 
-		.feature-icon {
-			background-color: #eff6ff;
-			border-radius: 50%;
-			width: 40px;
-			height: 40px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			flex-shrink: 0;
+		.features li {
+			padding: 0.5rem 0;
+			opacity: 0.8;
 		}
 
-		.feature-text {
-			margin: 0;
+		.features li::before {
+			content: "✓ ";
+			color: #4ade80;
+			font-weight: bold;
+			margin-right: 0.5rem;
 		}
 
-		.feature-text strong {
-			display: block;
-			margin-bottom: 4px;
-		}
-
-		@media (max-width: 600px) {
+		@media (max-width: 640px) {
 			.container {
-				padding: 20px;
+				padding: 2rem 1.5rem;
+				margin: 1rem;
+			}
+
+			h1 {
+				font-size: 2rem;
+			}
+
+			.icon {
+				font-size: 3rem;
 			}
 		}
 	</style>
@@ -100,58 +134,49 @@
 
 <body>
 	<div class="container">
-		<svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#2563eb">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-				d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-		</svg>
-		<h1>You're Offline</h1>
-		<p>No worries! This app is designed to work offline. You can still access most features and your data will sync
-			when you're back online.</p>
+		<div class="icon">🏥</div>
+		<h1>ATLAS</h1>
+		<p>You're currently offline, but ATLAS continues to work with cached data.</p>
 
-		<div class="features">
-			<div class="feature">
-				<div class="feature-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"
-						stroke="#2563eb">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-					</svg>
-				</div>
-				<p class="feature-text">
-					<strong>Patient Records</strong>
-					Access and update your patient records even while offline.
-				</p>
-			</div>
-			<div class="feature">
-				<div class="feature-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"
-						stroke="#2563eb">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-					</svg>
-				</div>
-				<p class="feature-text">
-					<strong>Clinical Guidelines</strong>
-					Review medical reference materials that have been stored locally.
-				</p>
-			</div>
-			<div class="feature">
-				<div class="feature-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"
-						stroke="#2563eb">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-					</svg>
-				</div>
-				<p class="feature-text">
-					<strong>Automatic Sync</strong>
-					Your data will automatically sync when your connection is restored.
-				</p>
-			</div>
+		<div class="status">
+			<strong>🔍 Offline Mode Active</strong><br>
+			Limited functionality available using cached content
 		</div>
 
-		<a href="/" class="button">Try to reconnect</a>
+		<div class="features">
+			<h3 style="margin-bottom: 1rem;">Available Offline:</h3>
+			<ul>
+				<li>View cached patient records</li>
+				<li>Browse clinical guidelines</li>
+				<li>Access consultation templates</li>
+				<li>Use basic clinical calculators</li>
+			</ul>
+		</div>
+
+		<button class="retry-btn" onclick="window.location.reload()">
+			🔄 Try Again
+		</button>
+
+		<p style="margin-top: 2rem; font-size: 0.9rem; opacity: 0.7;">
+			You'll automatically get full functionality when internet connection is restored.
+		</p>
 	</div>
+
+	<script>
+		// Auto-reload when online
+		window.addEventListener('online', () => {
+			console.log('Back online - reloading...');
+			window.location.reload();
+		});
+
+		// Show online status
+		if (navigator.onLine) {
+			document.querySelector('.status').innerHTML =
+				'<strong>🌐 Connection Restored</strong><br>Reloading page...';
+			setTimeout(() => window.location.reload(), 1000);
+		}
+	</script>
 </body>
 
 </html>
+`;
