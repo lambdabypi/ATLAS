@@ -1,0 +1,38 @@
+﻿{
+  "name": "atlas-backend",
+  "version": "1.0.0",
+  "description": "Backend API for ATLAS Clinical Decision Support System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "joi": "^17.11.0",
+    "sqlite3": "^5.1.6",
+    "better-sqlite3": "^9.1.1",
+    "uuid": "^9.0.1",
+    "multer": "^1.4.5-lts.1",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "keywords": ["medical", "clinical", "api", "healthcare", "atlas"],
+  "author": "ATLAS Developer",
+  "license": "MIT"
+}

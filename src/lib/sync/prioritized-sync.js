@@ -217,9 +217,9 @@ async function resolveConflict(item, serverResponse) {
 async function downloadPrioritizedUpdates() {
 	// Download critical clinical updates first
 	const prioritizedEndpoints = [
-		{ endpoint: 'clinical-guidelines', priority: SYNC_PRIORITIES.HIGH },
-		{ endpoint: 'medication-updates', priority: SYNC_PRIORITIES.HIGH },
-		{ endpoint: 'reference-data', priority: SYNC_PRIORITIES.MEDIUM }
+		{ endpoint: 'reference/guidelines', priority: SYNC_PRIORITIES.HIGH },
+		{ endpoint: 'reference/medications', priority: SYNC_PRIORITIES.HIGH },
+		{ endpoint: 'reference/conditions', priority: SYNC_PRIORITIES.MEDIUM }
 	];
 
 	for (const { endpoint, priority } of prioritizedEndpoints) {
@@ -251,12 +251,40 @@ function getDeviceId() {
 	return deviceId;
 }
 
-async function updateLocalData(endpoint, data) {
-	// Update local IndexedDB with downloaded data
-	// Implementation would depend on specific data structure
-	console.log(`Updated local ${endpoint} data with ${data.length} items`);
-}
+async function updateLocalData(endpoint, responseData) {
+	// Handle the response format from the backend: { data: [...], total: number, type: string }
+	console.log('Raw response data:', responseData); // Debug log
 
+	let actualData, count, dataType;
+
+	// Handle different response formats
+	if (responseData && responseData.data && Array.isArray(responseData.data)) {
+		// Backend format: { data: [...], total: number, type: string }
+		actualData = responseData.data;
+		count = responseData.total || responseData.data.length;
+		dataType = responseData.type;
+	} else if (Array.isArray(responseData)) {
+		// Direct array format
+		actualData = responseData;
+		count = responseData.length;
+		dataType = endpoint.split('/').pop(); // Extract type from endpoint
+	} else {
+		console.error('Unexpected response format:', responseData);
+		count = 0;
+		actualData = [];
+	}
+
+	console.log(`Updated local ${endpoint} (${dataType}) data with ${count} items`);
+
+	// TODO: Implement IndexedDB storage when ready
+	// For now, we're just logging the successful data retrieval
+
+	// Future implementation would go here:
+	// - Import proper database instance
+	// - Clear existing data
+	// - Bulk insert new data
+	// - Handle any storage errors
+}
 async function mergeWithAuditTrail(clientData, serverData) {
 	// Implement smart merging logic for patient data
 	const merged = { ...serverData, ...clientData };
