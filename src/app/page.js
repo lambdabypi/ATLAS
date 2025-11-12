@@ -1,4 +1,4 @@
-// src/app/page.js - FULLY SSR COMPATIBLE VERSION
+// src/app/page.js - FULLY SSR COMPATIBLE VERSION WITH CLEAN SW REGISTRATION
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -148,7 +148,7 @@ export default function Home() {
 		}
 	}, [isClientSide, userSystemInitialized, currentUser]); // Include isClientSide dependency
 
-	// Network status handlers - only in browser
+	// CLEAN SERVICE WORKER REGISTRATION + NETWORK HANDLERS
 	useEffect(() => {
 		if (!isClientSide) return;
 
@@ -158,25 +158,73 @@ export default function Home() {
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
 
-		// Service worker registration
+		// SINGLE, CLEAN SERVICE WORKER REGISTRATION
 		if ('serviceWorker' in navigator) {
-			window.addEventListener('load', () => {
-				navigator.serviceWorker.register('/service-worker.js').then(
-					(registration) => {
-						console.log('Service Worker registered with scope:', registration.scope);
-					},
-					(err) => {
-						console.log('Service Worker registration failed:', err);
+			const registerSW = async () => {
+				try {
+					// Unregister any existing service workers first
+					const registrations = await navigator.serviceWorker.getRegistrations();
+					for (const registration of registrations) {
+						console.log('🗑️ Unregistering old SW:', registration.scope);
+						await registration.unregister();
 					}
-				);
-			});
+
+					// Register the correct service worker
+					const registration = await navigator.serviceWorker.register('/sw.js', {
+						scope: '/',
+						updateViaCache: 'none'
+					});
+
+					console.log('✅ Service Worker registered successfully:', registration.scope);
+
+					// Wait for the service worker to be ready
+					await navigator.serviceWorker.ready;
+					console.log('🚀 Service Worker is ready and controlling the page');
+
+					// Test cache immediately after registration
+					await testCaching();
+
+				} catch (error) {
+					console.error('❌ Service Worker registration failed:', error);
+				}
+			};
+
+			// Test if caching is working
+			const testCaching = async () => {
+				try {
+					console.log('🧪 Testing cache functionality...');
+
+					// Check what caches exist
+					const cacheNames = await caches.keys();
+					console.log('📦 Available caches:', cacheNames);
+
+					// Force cache the current page
+					const cache = await caches.open('atlas-test-cache');
+					await cache.add(new Request(window.location.href, { cache: 'reload' }));
+					console.log('✅ Test: Current page cached manually');
+
+					// Check cache contents
+					const cachedRequests = await cache.keys();
+					console.log('📋 Cache contents:', cachedRequests.map(req => req.url));
+
+				} catch (error) {
+					console.error('❌ Cache test failed:', error);
+				}
+			};
+
+			// Register SW when page loads
+			if (document.readyState === 'loading') {
+				window.addEventListener('load', registerSW);
+			} else {
+				registerSW();
+			}
 		}
 
 		return () => {
 			window.removeEventListener('online', handleOnline);
 			window.removeEventListener('offline', handleOffline);
 		};
-	}, [isClientSide]);
+	}, [isClientSide, userSystemInitialized, currentUser]);
 
 	// Handle keyboard shortcuts - only in browser
 	useEffect(() => {
@@ -205,94 +253,47 @@ export default function Home() {
 		return () => window.removeEventListener('keydown', handleKeyPress);
 	}, [isClientSide]); // Depend on isClientSide
 
+	// Suppress Transformers.js errors
 	useEffect(() => {
-		if (typeof window !== 'undefined') {
-			const handleOnline = () => setIsOnline(true);
-			const handleOffline = () => setIsOnline(false);
+		if (!isClientSide) return;
 
-			window.addEventListener('online', handleOnline);
-			window.addEventListener('offline', handleOffline);
+		// Suppress non-critical Transformers.js worker errors
+		const originalError = window.console.error;
 
-			// Enhanced Service worker registration
-			if ('serviceWorker' in navigator) {
-				window.addEventListener('load', () => {
-					navigator.serviceWorker.register('/sw.js') // Note: your current SW is at /sw.js not /service-worker.js
-						.then((registration) => {
-							console.log('✅ Service Worker registered with scope:', registration.scope);
+		window.console.error = (...args) => {
+			const message = args.join(' ');
 
-							// Listen for updates
-							registration.addEventListener('updatefound', () => {
-								const newWorker = registration.installing;
-								if (newWorker) {
-									newWorker.addEventListener('statechange', () => {
-										if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-											console.log('🔄 New service worker available');
-										}
-									});
-								}
-							});
-						})
-						.catch((err) => {
-							console.error('❌ Service Worker registration failed:', err);
-						});
-
-					// Handle service worker messages
-					navigator.serviceWorker.addEventListener('message', (event) => {
-						if (event.data && event.data.type === 'OFFLINE_FALLBACK') {
-							console.log('📱 App is running in offline mode');
-							// You can show a notification here
-						}
-					});
-				});
+			// Skip logging these specific Transformers.js errors that don't affect functionality
+			if (
+				message.includes('S.replace is not a function') ||
+				message.includes('worker.js onmessage()') ||
+				message.includes('worker sent an error')
+			) {
+				return; // Don't log these non-critical errors
 			}
 
-			return () => {
-				window.removeEventListener('online', handleOnline);
-				window.removeEventListener('offline', handleOffline);
-			};
-		}
-	}, [userSystemInitialized, currentUser]);
+			// Log all other errors normally
+			originalError.apply(console, args);
+		};
 
-	useEffect(() => {
-		if (typeof window !== 'undefined') {
-			// Suppress non-critical Transformers.js worker errors
-			const originalError = window.console.error;
+		// Handle unhandled promise rejections from Transformers.js
+		const handleRejection = (event) => {
+			if (
+				event.reason?.message?.includes('S.replace is not a function') ||
+				event.reason?.message?.includes('worker.js')
+			) {
+				event.preventDefault();
+				console.warn('Suppressed non-critical Transformers.js worker error');
+			}
+		};
 
-			window.console.error = (...args) => {
-				const message = args.join(' ');
+		window.addEventListener('unhandledrejection', handleRejection);
 
-				// Skip logging these specific Transformers.js errors that don't affect functionality
-				if (
-					message.includes('S.replace is not a function') ||
-					message.includes('worker.js onmessage()') ||
-					message.includes('worker sent an error')
-				) {
-					return; // Don't log these non-critical errors
-				}
-
-				// Log all other errors normally
-				originalError.apply(console, args);
-			};
-
-			// Handle unhandled promise rejections from Transformers.js
-			const handleRejection = (event) => {
-				if (
-					event.reason?.message?.includes('S.replace is not a function') ||
-					event.reason?.message?.includes('worker.js')
-				) {
-					event.preventDefault();
-					console.warn('Suppressed non-critical Transformers.js worker error');
-				}
-			};
-
-			window.addEventListener('unhandledrejection', handleRejection);
-
-			return () => {
-				window.console.error = originalError;
-				window.removeEventListener('unhandledrejection', handleRejection);
-			};
-		}
-	}, []);
+		return () => {
+			window.console.error = originalError;
+			window.removeEventListener('unhandledrejection', handleRejection);
+		};
+	}, [isClientSide]);
 
 	// ✅ Handle conditional rendering - SSR safe
 	// Show loading during SSR or initial client hydration
