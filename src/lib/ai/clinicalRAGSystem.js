@@ -1,395 +1,542 @@
 // src/lib/ai/clinicalRAGSystem.js
-// FIXED RAG implementation using embeddings + template generation
-// No large language model needed - uses retrieval + structured responses
+// Complete fixed version with real embeddings and proper content extraction
 
-import { LightweightRAG } from '../rag/lightweightRAG';
+import { WorkingSemanticRAG } from './workingSemanticRAG';
 
 export class ClinicalRAGSystem {
 	constructor() {
-		this.rag = new LightweightRAG();
-		this.embedder = null;
+		this.semanticRAG = new WorkingSemanticRAG();
 		this.isInitialized = false;
-
-		// Use embeddings model instead of full LLM
-		this.modelConfig = {
-			name: 'sentence-transformers/all-MiniLM-L6-v2',
-			size: '23MB',
-			type: 'embeddings',
-			huggingFaceUrl: 'https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2'
-		};
-
 		this.responseTemplates = this.initializeResponseTemplates();
 
-		console.log('🏥 Clinical RAG System initialized (embeddings-based)');
+		console.log('🏥 Clinical RAG System (Real Embeddings) initialized');
 	}
 
 	async initialize() {
 		try {
-			console.log('🔄 Initializing RAG system...');
+			console.log('🔄 Initializing REAL semantic clinical RAG...');
 
-			// Initialize the lightweight RAG
-			await this.rag.initialize();
+			// Show initialization progress
+			const progressInterval = setInterval(() => {
+				console.log('⏳ Still loading embeddings model...');
+			}, 5000);
 
-			// Try to load embeddings model (optional)
-			await this.loadEmbeddingsModel();
+			const result = await this.semanticRAG.initialize();
+			clearInterval(progressInterval);
 
-			this.isInitialized = true;
-			console.log('✅ Clinical RAG system ready');
+			if (result.success) {
+				this.isInitialized = true;
+				console.log('✅ COMPLETE REAL SEMANTIC Clinical RAG system ready');
 
-			return { success: true, message: 'RAG system initialized successfully' };
+				// Test the embeddings are working
+				await this.testEmbeddings();
+
+				return { success: true, message: 'Real semantic RAG system initialized successfully' };
+			} else {
+				throw new Error(result.error);
+			}
 
 		} catch (error) {
-			console.error('❌ RAG initialization failed:', error);
+			console.error('❌ Real semantic RAG initialization failed:', error);
 			return { success: false, error: error.message };
 		}
 	}
 
-	async loadEmbeddingsModel() {
+	async testEmbeddings() {
 		try {
-			// Try to load ONNX embeddings model
-			if (typeof window !== 'undefined' && window.ort) {
-				console.log('🔄 Loading embeddings model...');
+			console.log('🧪 Testing real embeddings...');
 
-				// This would load the actual ONNX embeddings model
-				// For now, we'll use the simple text similarity from LightweightRAG
-				console.log('📝 Using text similarity embeddings (fallback)');
+			const testResults = await this.semanticRAG.semanticSearch('headache pain', {
+				age: 30,
+				gender: 'female'
+			}, 2);
 
-				this.embedder = {
-					type: 'text-similarity',
-					available: true
-				};
+			if (testResults.length > 0) {
+				console.log('✅ Embeddings test passed!');
+				console.log(`   Top result: ${testResults[0].document.title}`);
+				console.log(`   Similarity: ${testResults[0].similarity.toFixed(4)}`);
+			} else {
+				console.warn('⚠️ Embeddings test returned no results');
 			}
+
 		} catch (error) {
-			console.warn('⚠️ Embeddings model not available, using text similarity');
-			this.embedder = {
-				type: 'text-similarity',
-				available: false
-			};
+			console.error('❌ Embeddings test failed:', error);
 		}
 	}
 
-	initializeResponseTemplates() {
-		return {
-			// Template for WHO guideline responses
-			who_guideline: {
-				header: "**WHO CLINICAL GUIDELINE**\n",
-				sections: {
-					assessment: "**CLINICAL ASSESSMENT:**\n{assessment}\n\n",
-					management: "**MANAGEMENT:**\n{management}\n\n",
-					followup: "**FOLLOW-UP:**\n{followup}\n\n",
-					referral: "**REFERRAL CRITERIA:**\n{referral}\n\n"
-				},
-				footer: "\n---\n*Based on WHO Clinical Guidelines*"
-			},
-
-			// Template for emergency responses
-			emergency: {
-				header: "🚨 **EMERGENCY PROTOCOL**\n",
-				sections: {
-					immediate: "**IMMEDIATE ACTION:**\n{immediate}\n\n",
-					assessment: "**RAPID ASSESSMENT:**\n{assessment}\n\n",
-					treatment: "**EMERGENCY TREATMENT:**\n{treatment}\n\n",
-					referral: "**URGENT REFERRAL:**\n{referral}\n\n"
-				},
-				footer: "\n---\n*EMERGENCY PROTOCOL - Time-critical*"
-			},
-
-			// Template for IMCI responses  
-			imci: {
-				header: "**IMCI PROTOCOL** (Integrated Management of Childhood Illness)\n",
-				sections: {
-					danger_signs: "**DANGER SIGNS CHECK:**\n{danger_signs}\n\n",
-					assessment: "**AGE-APPROPRIATE ASSESSMENT:**\n{assessment}\n\n",
-					treatment: "**IMCI TREATMENT:**\n{treatment}\n\n",
-					followup: "**FOLLOW-UP:**\n{followup}\n\n"
-				},
-				footer: "\n---\n*WHO IMCI Guidelines*"
-			},
-
-			// Template for maternal health
-			maternal: {
-				header: "**MATERNAL HEALTH PROTOCOL**\n",
-				sections: {
-					assessment: "**ANTENATAL/POSTNATAL ASSESSMENT:**\n{assessment}\n\n",
-					danger_signs: "**MATERNAL DANGER SIGNS:**\n{danger_signs}\n\n",
-					management: "**CARE PLAN:**\n{management}\n\n",
-					referral: "**REFERRAL INDICATIONS:**\n{referral}\n\n"
-				},
-				footer: "\n---\n*WHO Maternal Health Guidelines*"
-			}
-		};
-	}
-
-	async generateClinicalRecommendation(query, patientData = {}, options = {}) {
-		const startTime = performance.now();
-
-		if (!this.isInitialized) {
-			await this.initialize();
-		}
-
+	async getClinicalRecommendations(query, patientData = {}, options = {}) {
 		try {
-			console.log('🔍 Processing clinical query with RAG...');
+			console.log(`🔍 Getting REAL semantic clinical recommendations for: "${query}"`);
 
-			// Step 1: Retrieve relevant clinical content
-			const retrievalResults = await this.rag.search(query, patientData);
-
-			if (!retrievalResults || retrievalResults.length === 0) {
-				return await this.generateFallbackResponse(query, patientData);
+			if (!this.isInitialized) {
+				await this.initialize();
 			}
 
-			// Step 2: Analyze clinical context
-			const clinicalContext = this.analyzeClinicalContext(query, patientData);
+			// Use REAL semantic search with embeddings
+			const semanticResults = await this.semanticRAG.semanticSearch(
+				query,
+				patientData,
+				options.maxResults || 3
+			);
 
-			// Step 3: Select appropriate response template
-			const template = this.selectResponseTemplate(clinicalContext, retrievalResults);
+			if (semanticResults.length === 0) {
+				return this.generateFallbackResponse(query, patientData, 'No semantically relevant documents found');
+			}
 
-			// Step 4: Generate structured clinical response
-			const response = this.constructClinicalResponse(template, retrievalResults, clinicalContext);
-
-			const responseTime = performance.now() - startTime;
+			// Generate structured response using REAL semantic results
+			const response = this.generateStructuredResponse(semanticResults, query, patientData);
 
 			return {
-				text: response.text,
-				confidence: response.confidence,
-				method: 'rag-clinical-retrieval',
-				sources: response.sources,
-				template: template.name,
-				responseTime,
-				timestamp: new Date(),
-				offline: true,
-				ragStats: {
-					documentsRetrieved: retrievalResults.length,
-					primarySource: retrievalResults[0]?.document?.title,
-					matchScore: retrievalResults[0]?.score
-				}
+				...response,
+				method: 'real-semantic-clinical-rag',
+				embeddingType: 'transformers-js',
+				searchResults: semanticResults.map(r => ({
+					title: r.document.title,
+					realSimilarity: r.similarity, // This is now REAL cosine similarity
+					boostedScore: r.boostedScore,
+					domain: r.document.domain,
+					relevantKeywords: r.relevantKeywords
+				})),
+				confidence: this.calculateSemanticConfidence(semanticResults)
 			};
 
 		} catch (error) {
-			console.error('❌ RAG generation failed:', error);
-			return await this.generateFallbackResponse(query, patientData, error);
+			console.error('🚨 Real semantic RAG error:', error);
+			return this.generateFallbackResponse(query, patientData, error);
 		}
 	}
 
-	analyzeClinicalContext(query, patientData) {
-		const queryLower = query.toLowerCase();
-		const symptoms = patientData?.symptoms?.toLowerCase() || '';
-		const allText = `${queryLower} ${symptoms}`;
+	generateStructuredResponse(semanticResults, query, patientData) {
+		const primaryResult = semanticResults[0];
+		const doc = primaryResult.document;
 
-		// Determine clinical domain and urgency
-		const context = {
-			domain: 'general',
-			urgency: 'routine',
-			ageGroup: this.getAgeGroup(patientData.age),
-			emergencyKeywords: []
-		};
+		// Use REAL similarity scores for better response type detection
+		const responseType = this.detectResponseType(doc, query, primaryResult.similarity);
+		const template = this.responseTemplates[responseType] || this.responseTemplates.general_clinical;
 
-		// Domain detection
-		if (patientData.pregnancy || allText.includes('pregnancy') || allText.includes('maternal')) {
-			context.domain = 'maternal';
-		} else if (context.ageGroup === 'pediatric') {
-			context.domain = 'imci';
-		} else if (allText.includes('emergency') || allText.includes('urgent') || allText.includes('critical')) {
-			context.domain = 'emergency';
+		const sections = this.extractSemanticSections(doc, query, patientData);
+
+		let response = template.header;
+
+		// Add confidence indicator based on REAL similarity
+		if (primaryResult.similarity > 0.8) {
+			response += "*High confidence match*\n\n";
+		} else if (primaryResult.similarity > 0.6) {
+			response += "*Good semantic match*\n\n";
 		}
 
-		// Emergency detection
-		const emergencyTerms = ['unconscious', 'convulsions', 'severe bleeding', 'difficulty breathing', 'shock'];
-		const foundEmergency = emergencyTerms.filter(term => allText.includes(term));
-
-		if (foundEmergency.length > 0) {
-			context.urgency = 'emergency';
-			context.emergencyKeywords = foundEmergency;
+		for (const [sectionKey, sectionTemplate] of Object.entries(template.sections)) {
+			if (sections[sectionKey]) {
+				response += sectionTemplate.replace(`{${sectionKey}}`, sections[sectionKey]);
+			}
 		}
 
-		return context;
-	}
-
-	selectResponseTemplate(clinicalContext, retrievalResults) {
-		// Select template based on clinical context
-		if (clinicalContext.urgency === 'emergency') {
-			return { name: 'emergency', template: this.responseTemplates.emergency };
+		// Add supporting information from other high-similarity results
+		if (semanticResults.length > 1) {
+			response += "\n**Additional Clinical Context:**\n";
+			semanticResults.slice(1, 3).forEach((result, idx) => {
+				if (result.similarity > 0.5) { // Only include high-quality matches
+					const snippet = this.extractKeySnippet(result.document, query);
+					response += `${idx + 1}. ${snippet} (similarity: ${result.similarity.toFixed(3)})\n`;
+				}
+			});
 		}
-
-		if (clinicalContext.domain === 'imci') {
-			return { name: 'imci', template: this.responseTemplates.imci };
-		}
-
-		if (clinicalContext.domain === 'maternal') {
-			return { name: 'maternal', template: this.responseTemplates.maternal };
-		}
-
-		// Default to WHO guideline template
-		return { name: 'who_guideline', template: this.responseTemplates.who_guideline };
-	}
-
-	constructClinicalResponse(templateInfo, retrievalResults, clinicalContext) {
-		const { template } = templateInfo;
-		const primaryResult = retrievalResults[0];
-
-		// Extract content sections from retrieved documents
-		const contentSections = this.extractContentSections(retrievalResults);
-
-		// Build response using template
-		let responseText = template.header;
-
-		// Populate template sections with retrieved content
-		Object.entries(template.sections).forEach(([sectionKey, sectionTemplate]) => {
-			const sectionContent = contentSections[sectionKey] || contentSections.default || 'Refer to clinical guidelines';
-			responseText += sectionTemplate.replace(`{${sectionKey}}`, sectionContent);
-		});
-
-		responseText += template.footer;
-
-		// Add emergency context if needed
-		if (clinicalContext.urgency === 'emergency') {
-			responseText = `🚨 **EMERGENCY CASE DETECTED** 🚨\n\n${responseText}`;
-		}
-
-		// Determine confidence based on retrieval quality
-		const confidence = this.calculateConfidence(retrievalResults, clinicalContext);
 
 		return {
-			text: responseText,
-			confidence,
-			sources: retrievalResults.map(r => r.document?.title || 'Clinical Guideline'),
-			primaryGuideline: primaryResult?.document?.title
+			text: response.trim(),
+			primarySource: {
+				title: doc.title,
+				domain: doc.domain,
+				realSimilarity: primaryResult.similarity,
+				embeddingBased: true
+			},
+			additionalSources: semanticResults.slice(1).map(r => ({
+				title: r.document.title,
+				realSimilarity: r.similarity,
+				embeddingBased: true
+			}))
 		};
 	}
 
-	extractContentSections(retrievalResults) {
+	detectResponseType(doc, query, similarity) {
+		const content = doc.content.toLowerCase();
+		const queryLower = query.toLowerCase();
+
+		// Use REAL similarity thresholds for better detection
+		if (similarity > 0.85) { // Very high similarity
+			if (content.includes('emergency') || content.includes('urgent') || queryLower.includes('emergency')) {
+				return 'emergency_clinical';
+			}
+			if (content.includes('maternal') || content.includes('pregnancy')) {
+				return 'maternal_health';
+			}
+			if (content.includes('who guideline') || content.includes('who standard')) {
+				return 'who_guideline';
+			}
+		}
+
+		if (similarity > 0.7) {
+			return 'general_clinical';
+		}
+
+		if (similarity > 0.5) {
+			return 'basic_guidance';
+		}
+
+		return 'low_confidence';
+	}
+
+	calculateSemanticConfidence(results) {
+		if (results.length === 0) return 'very-low';
+
+		const topSimilarity = results[0].similarity;
+		const avgSimilarity = results.reduce((sum, r) => sum + r.similarity, 0) / results.length;
+
+		// Use REAL similarity thresholds
+		if (topSimilarity > 0.85 && avgSimilarity > 0.7) return 'very-high';
+		if (topSimilarity > 0.75 && avgSimilarity > 0.6) return 'high';
+		if (topSimilarity > 0.6 && avgSimilarity > 0.4) return 'medium';
+		if (topSimilarity > 0.4) return 'low';
+		return 'very-low';
+	}
+
+	// FIXED: Content extraction methods that handle both strings and objects
+	extractSemanticSections(doc, query, patientData) {
+		// FIXED: Handle both object and string content
+		let content = '';
+
+		if (typeof doc.fullContent === 'string') {
+			content = doc.fullContent;
+		} else if (typeof doc.fullContent === 'object' && doc.fullContent !== null) {
+			// Extract text from object structure
+			content = this.extractTextFromObject(doc.fullContent);
+		} else if (typeof doc.content === 'string') {
+			content = doc.content;
+		} else {
+			content = doc.title || 'No content available';
+		}
+
 		const sections = {};
+		const queryIntent = this.getQueryIntent(query);
 
-		// Extract different types of clinical content from retrieved documents
-		for (const result of retrievalResults.slice(0, 3)) { // Use top 3 results
-			const content = result.document?.content || result.text || '';
+		if (queryIntent.needsAssessment) {
+			sections.assessment = this.extractAssessmentGuidance(content, patientData);
+		}
 
-			// Simple extraction based on common clinical section patterns
-			if (content.includes('ASSESSMENT') || content.includes('Assessment')) {
-				sections.assessment = this.extractSection(content, 'assessment');
-			}
+		if (queryIntent.needsManagement) {
+			sections.management = this.extractManagementGuidance(content, patientData);
+		}
 
-			if (content.includes('MANAGEMENT') || content.includes('Treatment')) {
-				sections.management = this.extractSection(content, 'management');
-			}
+		if (queryIntent.needsFollowup) {
+			sections.followup = this.extractFollowupGuidance(content);
+		}
 
-			if (content.includes('FOLLOW') || content.includes('Follow-up')) {
-				sections.followup = this.extractSection(content, 'followup');
-			}
-
-			if (content.includes('REFER') || content.includes('Referral')) {
-				sections.referral = this.extractSection(content, 'referral');
-			}
-
-			if (content.includes('DANGER') || content.includes('Emergency')) {
-				sections.danger_signs = this.extractSection(content, 'danger_signs');
-			}
-
-			if (content.includes('IMMEDIATE') || content.includes('Urgent')) {
-				sections.immediate = this.extractSection(content, 'immediate');
-			}
-
-			// Default content if no specific sections found
-			if (!sections.default && content.length > 50) {
-				sections.default = content.substring(0, 300) + '...';
-			}
+		if (queryIntent.needsReferral) {
+			sections.referral = this.extractReferralGuidance(content);
 		}
 
 		return sections;
 	}
 
-	extractSection(content, sectionType) {
-		// Simple section extraction - this could be enhanced with better NLP
-		const lines = content.split('\n');
-		const relevantLines = [];
+	// FIXED: Helper method to extract text from object structures
+	extractTextFromObject(obj) {
+		let text = '';
 
-		let inSection = false;
-		for (const line of lines) {
-			if (line.toLowerCase().includes(sectionType) || inSection) {
-				relevantLines.push(line);
-				inSection = true;
+		if (typeof obj === 'string') {
+			return obj;
+		}
 
-				if (relevantLines.length >= 3 && line.trim() === '') {
-					break; // End of section
+		if (Array.isArray(obj)) {
+			return obj.map(item => this.extractTextFromObject(item)).join(' ');
+		}
+
+		if (typeof obj === 'object' && obj !== null) {
+			for (const [key, value] of Object.entries(obj)) {
+				if (typeof value === 'string') {
+					text += value + ' ';
+				} else if (Array.isArray(value)) {
+					text += value.join(' ') + ' ';
+				} else if (typeof value === 'object' && value !== null) {
+					text += this.extractTextFromObject(value) + ' ';
 				}
 			}
 		}
 
-		return relevantLines.join('\n').trim().substring(0, 200) + '...';
+		return text.trim();
 	}
 
-	calculateConfidence(retrievalResults, clinicalContext) {
-		if (!retrievalResults || retrievalResults.length === 0) {
-			return 'very-low';
-		}
+	getQueryIntent(query) {
+		const queryLower = query.toLowerCase();
 
-		const topScore = retrievalResults[0].score || 0;
-		const resultCount = retrievalResults.length;
-
-		if (topScore > 0.8 && resultCount >= 2 && clinicalContext.urgency !== 'emergency') {
-			return 'high';
-		} else if (topScore > 0.6 && resultCount >= 1) {
-			return 'medium';
-		} else if (topScore > 0.3) {
-			return 'low';
-		} else {
-			return 'very-low';
-		}
+		return {
+			needsAssessment: queryLower.includes('assess') || queryLower.includes('diagnose') || queryLower.includes('evaluate'),
+			needsManagement: queryLower.includes('treat') || queryLower.includes('manage') || queryLower.includes('therapy'),
+			needsFollowup: queryLower.includes('follow') || queryLower.includes('monitor') || queryLower.includes('next'),
+			needsReferral: queryLower.includes('refer') || queryLower.includes('specialist') || queryLower.includes('hospital')
+		};
 	}
 
-	getAgeGroup(age) {
-		if (!age) return 'adult';
-		if (age < 5) return 'pediatric';
-		if (age >= 15 && age <= 49) return 'reproductive';
-		if (age > 65) return 'elderly';
-		return 'adult';
+	// FIXED: Assessment guidance extraction with proper string handling
+	extractAssessmentGuidance(content, patientData) {
+		// Ensure content is a string
+		const contentStr = typeof content === 'string' ? content : this.extractTextFromObject(content);
+
+		if (!contentStr) {
+			return 'Conduct comprehensive clinical assessment based on presenting complaint.';
+		}
+
+		const lines = contentStr.split('\n');
+		const assessmentLines = lines.filter(line =>
+			line.toLowerCase().includes('assess') ||
+			line.toLowerCase().includes('examination') ||
+			line.toLowerCase().includes('symptom') ||
+			line.toLowerCase().includes('sign') ||
+			line.toLowerCase().includes('history') ||
+			line.toLowerCase().includes('vital')
+		);
+
+		if (assessmentLines.length > 0) {
+			return assessmentLines.slice(0, 4).join('\n');
+		}
+
+		// Fallback for headache-specific assessment
+		if (contentStr.toLowerCase().includes('headache')) {
+			return `Clinical Assessment:
+• Detailed headache history: onset, character, location, severity
+• Associated symptoms: nausea, vomiting, visual changes, fever
+• Neurological examination including fundoscopy if available
+• Vital signs with particular attention to blood pressure
+• Check for red flag symptoms requiring urgent referral`;
+		}
+
+		return 'Conduct systematic clinical assessment including history, examination, and vital signs.';
+	}
+
+	// FIXED: Management guidance extraction
+	extractManagementGuidance(content, patientData) {
+		const contentStr = typeof content === 'string' ? content : this.extractTextFromObject(content);
+
+		if (!contentStr) {
+			return 'Follow standard clinical management protocols for the presenting condition.';
+		}
+
+		const lines = contentStr.split('\n');
+		const managementLines = lines.filter(line =>
+			line.toLowerCase().includes('treatment') ||
+			line.toLowerCase().includes('manage') ||
+			line.toLowerCase().includes('medication') ||
+			line.toLowerCase().includes('therapy') ||
+			line.toLowerCase().includes('paracetamol') ||
+			line.toLowerCase().includes('ibuprofen')
+		);
+
+		if (managementLines.length > 0) {
+			return managementLines.slice(0, 4).join('\n');
+		}
+
+		// Fallback for headache-specific management
+		if (contentStr.toLowerCase().includes('headache')) {
+			return `Management Approach:
+• First-line: Paracetamol 500-1000mg every 6 hours (max 4g/24h)
+• Alternative: Ibuprofen 400mg every 8 hours with food
+• Rest in quiet, darkened environment
+• Adequate hydration and regular meals
+• Address underlying causes (hypertension, sinusitis)`;
+		}
+
+		return 'Implement appropriate management based on clinical assessment findings and established protocols.';
+	}
+
+	// FIXED: Follow-up guidance extraction
+	extractFollowupGuidance(content) {
+		const contentStr = typeof content === 'string' ? content : this.extractTextFromObject(content);
+
+		if (!contentStr) {
+			return 'Schedule appropriate follow-up based on clinical response and patient needs.';
+		}
+
+		const lines = contentStr.split('\n');
+		const followupLines = lines.filter(line =>
+			line.toLowerCase().includes('follow') ||
+			line.toLowerCase().includes('monitor') ||
+			line.toLowerCase().includes('review') ||
+			line.toLowerCase().includes('return')
+		);
+
+		if (followupLines.length > 0) {
+			return followupLines.slice(0, 3).join('\n');
+		}
+
+		return 'Review patient in 48-72 hours if symptoms persist or worsen. Advise patient to return immediately if red flag symptoms develop.';
+	}
+
+	// FIXED: Referral guidance extraction
+	extractReferralGuidance(content) {
+		const contentStr = typeof content === 'string' ? content : this.extractTextFromObject(content);
+
+		if (!contentStr) {
+			return 'Consider referral to appropriate specialist if symptoms persist or concerning features develop.';
+		}
+
+		const lines = contentStr.split('\n');
+		const referralLines = lines.filter(line =>
+			line.toLowerCase().includes('refer') ||
+			line.toLowerCase().includes('specialist') ||
+			line.toLowerCase().includes('hospital') ||
+			line.toLowerCase().includes('urgent') ||
+			line.toLowerCase().includes('emergency')
+		);
+
+		if (referralLines.length > 0) {
+			return referralLines.slice(0, 3).join('\n');
+		}
+
+		// Fallback for headache-specific referral criteria
+		if (contentStr.toLowerCase().includes('headache')) {
+			return `Referral Criteria:
+• URGENT: Sudden severe headache, fever with neck stiffness, neurological signs
+• ROUTINE: Recurrent headaches not responding to simple analgesics
+• Consider neurology referral for chronic daily headache or suspected migraine`;
+		}
+
+		return 'Refer if symptoms are severe, persistent, or concerning features are present.';
+	}
+
+	extractKeySnippet(doc, query) {
+		const content = doc.content;
+		const sentences = content.split(/[.!?]+/);
+
+		const queryTerms = query.toLowerCase().split(/\s+/);
+		let bestSentence = sentences[0];
+		let maxRelevance = 0;
+
+		for (const sentence of sentences) {
+			const sentenceLower = sentence.toLowerCase();
+			const relevance = queryTerms.reduce((count, term) =>
+				count + (sentenceLower.includes(term) ? 1 : 0), 0
+			);
+
+			if (relevance > maxRelevance) {
+				maxRelevance = relevance;
+				bestSentence = sentence;
+			}
+		}
+
+		return bestSentence.trim().substring(0, 150) + '...';
+	}
+
+	initializeResponseTemplates() {
+		return {
+			who_guideline: {
+				header: "**WHO CLINICAL GUIDELINE**\n\n",
+				sections: {
+					assessment: "**CLINICAL ASSESSMENT:**\n{assessment}\n\n",
+					management: "**MANAGEMENT:**\n{management}\n\n",
+					followup: "**FOLLOW-UP:**\n{followup}\n\n",
+					referral: "**REFERRAL CRITERIA:**\n{referral}\n\n"
+				}
+			},
+			emergency_clinical: {
+				header: "**🚨 EMERGENCY CLINICAL GUIDANCE**\n\n",
+				sections: {
+					assessment: "**IMMEDIATE ASSESSMENT:**\n{assessment}\n\n",
+					management: "**URGENT MANAGEMENT:**\n{management}\n\n",
+					referral: "**IMMEDIATE REFERRAL:**\n{referral}\n\n"
+				}
+			},
+			maternal_health: {
+				header: "**MATERNAL HEALTH GUIDANCE**\n\n",
+				sections: {
+					assessment: "**MATERNAL ASSESSMENT:**\n{assessment}\n\n",
+					management: "**CARE MANAGEMENT:**\n{management}\n\n",
+					followup: "**ANTENATAL/POSTNATAL FOLLOW-UP:**\n{followup}\n\n"
+				}
+			},
+			general_clinical: {
+				header: "**CLINICAL GUIDANCE**\n\n",
+				sections: {
+					assessment: "**ASSESSMENT:**\n{assessment}\n\n",
+					management: "**MANAGEMENT:**\n{management}\n\n",
+					followup: "**FOLLOW-UP:**\n{followup}\n\n"
+				}
+			},
+			basic_guidance: {
+				header: "**BASIC CLINICAL GUIDANCE**\n\n",
+				sections: {
+					assessment: "**CONSIDER:**\n{assessment}\n\n",
+					management: "**GENERAL APPROACH:**\n{management}\n\n"
+				}
+			},
+			low_confidence: {
+				header: "**CLINICAL GUIDANCE** *(Lower Confidence)*\n\n",
+				sections: {
+					assessment: "**GENERAL CONSIDERATIONS:**\n{assessment}\n\n",
+					management: "**SUGGESTED APPROACH:**\n{management}\n\n"
+				}
+			}
+		};
 	}
 
 	async generateFallbackResponse(query, patientData, error = null) {
-		// Fallback to rule-based system
 		try {
 			const { getPracticalLocalRecommendations } = await import('./practicalLocalAI');
 			const ruleBasedResponse = await getPracticalLocalRecommendations(query, patientData);
 
 			return {
 				...ruleBasedResponse,
-				method: 'rag-fallback-to-rules',
-				fallbackReason: error?.message || 'RAG retrieval failed',
-				confidence: 'medium' // Rule-based is reliable
+				method: 'real-semantic-rag-fallback-to-rules',
+				fallbackReason: error?.message || 'Real semantic RAG retrieval failed',
+				confidence: 'medium'
 			};
 
 		} catch (fallbackError) {
-			console.error('❌ Both RAG and rule-based failed:', fallbackError);
+			console.error('❌ Both real semantic RAG and rule-based failed:', fallbackError);
 
 			return {
-				text: `**Clinical Decision Support Unavailable**\n\nBoth RAG and rule-based systems encountered errors. Please refer to standard clinical protocols and use professional judgment.\n\n**Basic Approach:**\n• Complete systematic assessment\n• Apply standard care protocols\n• Consider patient safety and referral needs`,
+				text: `**Clinical Decision Support Unavailable**\n\nBoth real semantic RAG and rule-based systems encountered errors. Please consult local clinical guidelines or specialist.\n\n**Query**: ${query}\n**Error**: ${error?.message || 'System unavailable'}`,
 				method: 'emergency-fallback',
 				confidence: 'very-low',
-				error: fallbackError.message
+				error: true
 			};
 		}
 	}
 
-	async getStatus() {
+	// ADDED: Status method for system monitoring
+	getStatus() {
 		return {
 			initialized: this.isInitialized,
-			ragAvailable: this.rag?.initialized || false,
-			embeddingsModel: this.embedder?.type || 'none',
-			method: 'clinical-rag-system',
+			available: this.isInitialized,
+			embeddingBased: true,
+			embeddingModel: 'Xenova/all-MiniLM-L6-v2',
+			documentCount: this.semanticRAG?.documents?.length || 0,
+			guidelineCount: this.semanticRAG?.documents?.length || 0,
 			responseTemplates: Object.keys(this.responseTemplates).length,
-			offline: true
+			semanticRAGInitialized: this.semanticRAG?.isInitialized || false,
+			type: 'real-semantic-clinical-rag',
+			dependencies: ['transformers-js', 'lightweight-rag'],
+			version: 'v2-real-embeddings'
 		};
 	}
 }
 
-// Export singleton
-export const clinicalRAGSystem = new ClinicalRAGSystem();
+// Export functions for compatibility
+export async function initializeClinicalRAG() {
+	const system = new ClinicalRAGSystem();
+	const result = await system.initialize();
 
-// Main function
-export async function getClinicalRAGRecommendations(query, patientData, options = {}) {
-	return await clinicalRAGSystem.generateClinicalRecommendation(query, patientData, options);
+	return {
+		success: result.success,
+		message: result.message,
+		system: result.success ? system : null
+	};
 }
 
-// Initialize function
-export async function initializeClinicalRAG() {
-	return await clinicalRAGSystem.initialize();
+export async function getClinicalRAGRecommendations(query, patientData = {}, options = {}) {
+	const system = new ClinicalRAGSystem();
+
+	if (!system.isInitialized) {
+		await system.initialize();
+	}
+
+	return system.getClinicalRecommendations(query, patientData, options);
 }
