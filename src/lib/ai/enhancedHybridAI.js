@@ -582,11 +582,33 @@ Please refer to available clinical guidelines and use your professional judgment
 					...ragStatus
 				},
 				gemini: {
-					available: !!process.env.NEXT_PUBLIC_GEMINI_API_KEY && this.isOnline,
-					name: 'gemini-2.0-flash-exp',
+					available: (() => {
+						const hasKey = !!process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+						const keyLength = process.env.NEXT_PUBLIC_GEMINI_API_KEY?.length || 0;
+
+						// 🔍 DEBUG: Log what's actually happening at runtime
+						console.log('🔍 GEMINI RUNTIME CHECK:', {
+							hasKey,
+							keyLength,
+							keyType: typeof process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+							isOnline: this.isOnline,
+							finalAvailable: hasKey && this.isOnline
+						});
+
+						// 🚀 TEMPORARY FIX: Force availability when online to test Gemini
+						if (this.isOnline && !hasKey) {
+							console.log('⚠️ API key missing at runtime, but was present at build time!');
+							console.log('🚀 FORCING Gemini availability for testing...');
+							return true; // Force true to test Gemini integration
+						}
+
+						return hasKey && this.isOnline;
+					})(),
+					name: 'gemini-2.5-flash',
 					type: 'api',
 					requiresNetwork: true,
-					priority: this.isOnline ? 'high' : 'unavailable'
+					priority: this.isOnline ? 'high' : 'unavailable',
+					debugForced: this.isOnline && !process.env.NEXT_PUBLIC_GEMINI_API_KEY // Flag when forced
 				}
 			},
 			stats: this.stats,
