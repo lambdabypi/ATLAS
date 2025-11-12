@@ -7,6 +7,11 @@ import { initializeEnhancedAtlas } from '../lib/initializeEnhancedAtlas';
 import { useUserSystem } from '../lib/auth/simpleUserSystem';
 import { UserSelection } from '../components/auth/UserSelection';
 
+console.log('Build-time Gemini API Key check:', {
+	hasKey: typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+	nodeEnv: typeof process !== 'undefined' ? process.env.NODE_ENV : 'browser-only'
+});
+
 // Import performance monitor lazily to avoid SSR issues
 let performanceMonitor = null;
 
