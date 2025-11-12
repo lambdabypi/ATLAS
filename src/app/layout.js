@@ -1,4 +1,4 @@
-// src/app/layout.js - ENHANCED Manual Cache with Query Params
+// src/app/layout.js - ENHANCED with Storage Persistence
 'use client';
 
 import { useEffect } from 'react';
@@ -7,146 +7,187 @@ import './globals.css';
 import AppShell from '../components/layout/AppShell';
 import '../styles/components.css';
 
+// Import our new storage persistence manager
+import {
+	storagePersistenceManager,
+	registerEnhancedServiceWorker,
+	setupReloadProtection
+} from '../lib/utils/storagePersistenceManager';
+
 const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }) {
 	useEffect(() => {
-		const enhancedManualCache = async () => {
-			if (!('caches' in window) || !navigator.onLine) {
-				console.log('⚠️ Skipping manual cache - offline or not supported');
-				return;
-			}
+		const initializeAtlasPersistence = async () => {
+			if (typeof window === 'undefined') return;
 
+			console.log('🏥 Initializing ATLAS with enhanced persistence...');
+
+			// STEP 1: Setup reload protection immediately
+			setupReloadProtection();
+
+			// STEP 2: Request persistent storage BEFORE any caching
 			try {
-				console.log('🔧 Starting enhanced manual cache backup (online)...');
+				const persistenceStatus = await storagePersistenceManager.requestPersistentStorage();
 
-				const cache = await caches.open('atlas-manual-v2');
-
-				// ENHANCED: Include common query parameter combinations
-				const urlsToCache = [
-					'/',
-					'/dashboard',
-					'/patients',
-					'/patients/1',
-					'/patients/2',
-					'/consultation',
-					'/consultation/new',
-					'/consultation/new?patientId=1', // ADDED: Your specific failing URL
-					'/consultation/new?patientId=2',
-					'/reference',
-					'/testing'
-				];
-
-				let successCount = 0;
-
-				for (const url of urlsToCache) {
-					try {
-						const fullUrl = window.location.origin + url;
-
-						// Check if already cached
-						const cachedResponse = await cache.match(fullUrl);
-						if (cachedResponse) {
-							console.log('✅ Already cached:', url);
-							successCount++;
-							continue;
-						}
-
-						// ENHANCED: Pre-fetch and cache
-						const response = await fetch(fullUrl);
-						if (response.ok) {
-							await cache.put(fullUrl, response);
-							console.log('✅ Manually cached:', url);
-							successCount++;
-						} else {
-							console.warn('⚠️ Bad response for:', url, response.status);
-						}
-					} catch (err) {
-						console.warn('⚠️ Failed to cache:', url, err.message);
-					}
+				if (persistenceStatus.persistent) {
+					console.log('✅ ATLAS has persistent storage - data will survive reloads!');
+				} else {
+					console.warn('⚠️ ATLAS running without persistent storage - data may be lost on reload');
 				}
-
-				// CRITICAL: Also cache the current page if it has query params
-				const currentUrl = window.location.href;
-				if (currentUrl.includes('?')) {
-					try {
-						const cachedResponse = await cache.match(currentUrl);
-						if (!cachedResponse) {
-							const response = await fetch(currentUrl);
-							if (response.ok) {
-								await cache.put(currentUrl, response);
-								console.log('✅ Cached current page with params:', currentUrl);
-								successCount++;
-							}
-						}
-					} catch (err) {
-						console.warn('⚠️ Failed to cache current page:', err.message);
-					}
-				}
-
-				console.log(`🎉 Enhanced manual caching complete! ${successCount} URLs cached`);
-
-				// ENHANCED: Also pre-cache in service worker cache
-				if ('serviceWorker' in navigator) {
-					try {
-						const registration = await navigator.serviceWorker.ready;
-						if (registration.active) {
-							registration.active.postMessage({
-								type: 'PRECACHE_URLS',
-								urls: urlsToCache
-							});
-						}
-					} catch (err) {
-						console.warn('⚠️ SW precache message failed:', err.message);
-					}
-				}
-
 			} catch (error) {
-				console.error('❌ Enhanced manual cache failed:', error);
+				console.error('Failed to setup storage persistence:', error);
 			}
+
+			// STEP 3: Register enhanced service worker with immediate claim
+			try {
+				const registration = await registerEnhancedServiceWorker();
+				if (registration) {
+					console.log('✅ Enhanced service worker registered');
+				} else {
+					console.warn('⚠️ Service worker registration failed');
+				}
+			} catch (error) {
+				console.error('Service worker error:', error);
+			}
+
+			// STEP 4: Enhanced manual caching (after persistence is established)
+			await enhancedManualCache();
+
+			// STEP 5: Setup storage monitoring
+			storagePersistenceManager.setupStorageMonitoring();
+
+			console.log('🎉 ATLAS persistence initialization complete!');
 		};
 
+		// CRITICAL: Initialize persistence immediately, don't wait
+		if (typeof window !== 'undefined') {
+			// Start immediately - don't delay this!
+			initializeAtlasPersistence();
+		}
+
+		// Network event handlers (unchanged but improved)
 		const handleOnline = () => {
-			console.log('🌐 Back online - refreshing enhanced caches...');
-			setTimeout(enhancedManualCache, 1000);
+			console.log('🟢 Network: Back online');
+			setTimeout(() => {
+				enhancedManualCache();
+			}, 1000);
 		};
 
 		const handleOffline = () => {
-			console.log('📱 Gone offline - enhanced cache paused');
+			console.log('🔴 Network: Gone offline - data should persist through reloads');
 		};
 
-		// Initial cache only if online
 		if (typeof window !== 'undefined') {
-			if (navigator.onLine) {
-				// Delay initial cache to let page load first
-				setTimeout(enhancedManualCache, 2000);
-			}
-
 			window.addEventListener('online', handleOnline);
 			window.addEventListener('offline', handleOffline);
-
-			// ENHANCED: Cache pages as user navigates
-			const cacheCurrentPageOnNavigation = () => {
-				if (navigator.onLine && 'caches' in window) {
-					caches.open('atlas-manual-v2').then(cache => {
-						cache.put(window.location.href, new Response()).catch(() => {
-							// Silent fail for navigation cache
-						});
-					});
-				}
-			};
-
-			// Cache page on navigation
-			window.addEventListener('beforeunload', cacheCurrentPageOnNavigation);
 		}
 
 		return () => {
 			if (typeof window !== 'undefined') {
 				window.removeEventListener('online', handleOnline);
 				window.removeEventListener('offline', handleOffline);
-				window.removeEventListener('beforeunload', cacheCurrentPageOnNavigation);
 			}
 		};
-	}, []);
+	}, []); // Run only once
+
+	// Enhanced manual cache with better error handling
+	const enhancedManualCache = async () => {
+		if (!('caches' in window)) {
+			console.log('⚠️ Cache API not supported');
+			return;
+		}
+
+		try {
+			console.log('🔧 Starting enhanced manual cache with persistence...');
+
+			const cache = await caches.open('atlas-manual-v3'); // Increment version
+
+			const urlsToCache = [
+				'/',
+				'/dashboard',
+				'/patients',
+				'/patients/1',
+				'/patients/2',
+				'/consultation',
+				'/consultation/new',
+				'/consultation/new?patientId=1',
+				'/consultation/new?patientId=2',
+				'/reference',
+				'/testing'
+			];
+
+			let successCount = 0;
+
+			for (const url of urlsToCache) {
+				try {
+					const fullUrl = window.location.origin + url;
+
+					// Check if already cached
+					const cachedResponse = await cache.match(fullUrl);
+					if (cachedResponse) {
+						console.log('✅ Already cached:', url);
+						successCount++;
+						continue;
+					}
+
+					// Only cache if online
+					if (!navigator.onLine) {
+						console.log('📱 Offline - skipping cache of:', url);
+						continue;
+					}
+
+					// Cache with timeout
+					const controller = new AbortController();
+					const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+					const response = await fetch(fullUrl, {
+						signal: controller.signal,
+						cache: 'no-cache' // Always fetch fresh version
+					});
+
+					clearTimeout(timeoutId);
+
+					if (response.ok) {
+						await cache.put(fullUrl, response);
+						console.log('✅ Manually cached:', url);
+						successCount++;
+					} else {
+						console.warn('⚠️ Bad response for:', url, response.status);
+					}
+				} catch (err) {
+					if (err.name === 'AbortError') {
+						console.warn('⚠️ Cache timeout for:', url);
+					} else {
+						console.warn('⚠️ Failed to cache:', url, err.message);
+					}
+				}
+			}
+
+			// Also cache the current page if it has query params
+			const currentUrl = window.location.href;
+			if (currentUrl.includes('?')) {
+				try {
+					const cachedResponse = await cache.match(currentUrl);
+					if (!cachedResponse && navigator.onLine) {
+						const response = await fetch(currentUrl);
+						if (response.ok) {
+							await cache.put(currentUrl, response);
+							console.log('✅ Cached current page with params:', currentUrl);
+							successCount++;
+						}
+					}
+				} catch (err) {
+					console.warn('⚠️ Failed to cache current page:', err.message);
+				}
+			}
+
+			console.log(`🎉 Enhanced manual caching complete! ${successCount} URLs cached with persistence`);
+
+		} catch (error) {
+			console.error('❌ Enhanced manual cache failed:', error);
+		}
+	};
 
 	return (
 		<html lang="en">
@@ -161,6 +202,12 @@ export default function RootLayout({ children }) {
 				<meta name="apple-mobile-web-app-title" content="Clinical Support" />
 				<meta name="format-detection" content="telephone=no" />
 				<meta name="mobile-web-app-capable" content="yes" />
+
+				{/* CRITICAL: Add these PWA optimization meta tags */}
+				<meta name="apple-mobile-web-app-capable" content="yes" />
+				<meta name="mobile-web-app-capable" content="yes" />
+				<meta name="apple-touch-fullscreen" content="yes" />
+
 				<link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
 				<link rel="manifest" href="/manifest.json" />
 			</head>
