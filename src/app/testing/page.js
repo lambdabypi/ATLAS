@@ -2,7 +2,7 @@
 // src/app/testing/page.js
 
 import { useState, useEffect } from 'react';
-import CacheDebugger from '@/components/ui/CacheDebugger';
+import CacheDebugger from '../../components/ui/CacheDebugger';
 
 export default function TestingPage() {
 	const [pageData, setPageData] = useState({
