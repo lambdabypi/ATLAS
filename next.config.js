@@ -1,4 +1,4 @@
-// next.config.js - Enhanced PWA configuration
+// next.config.js - FIXED VERSION (Removes invalid customWorkerPath)
 const withPWA = require('next-pwa')({
 	dest: 'public',
 	register: true,
@@ -29,14 +29,6 @@ const withPWA = require('next-pwa')({
 					maxAgeSeconds: 24 * 60 * 60, // 1 day
 				},
 				networkTimeoutSeconds: 5,
-				plugins: [
-					{
-						cacheKeyWillBeUsed: async ({ request }) => {
-							// Custom cache key for API requests
-							return `${request.url}-${Date.now() % (24 * 60 * 60 * 1000)}`;
-						}
-					}
-				]
 			},
 		},
 		{
@@ -87,17 +79,17 @@ const withPWA = require('next-pwa')({
 		}
 	],
 
-	// ENHANCED: Better offline fallbacks
+	// ENHANCED: Better offline fallbacks (FIXED - removed invalid options)
 	fallbacks: {
 		document: '/offline',
-		image: '/icons/offline-fallback.png',
-		audio: '/audio/offline-message.mp3',
-		video: '/video/offline-placeholder.mp4',
-		font: '/fonts/fallback-font.woff2'
+		// Note: Only add these if you have the actual files
+		// image: '/icons/offline-fallback.png',
+		// audio: '/audio/offline-message.mp3', 
+		// video: '/video/offline-placeholder.mp4',
+		// font: '/fonts/fallback-font.woff2'
 	},
 
-	// ENHANCED: Custom worker
-	customWorkerPath: '/sw.js',
+	// REMOVED: customWorkerPath - not valid for GenerateSW strategy
 
 	// PWA configuration for better offline experience
 	buildExcludes: [
@@ -185,11 +177,6 @@ const nextConfig = {
 						key: 'X-Content-Type-Options',
 						value: 'nosniff',
 					},
-					// ENHANCED: Better PWA caching
-					{
-						key: 'Cache-Control',
-						value: 'public, max-age=31536000, immutable',
-					},
 				],
 			},
 			{
@@ -222,52 +209,11 @@ const nextConfig = {
 					},
 				],
 			},
-			// ENHANCED: API route caching
-			{
-				source: '/api/(.*)',
-				headers: [
-					{
-						key: 'Cache-Control',
-						value: 'public, s-maxage=60, stale-while-revalidate=300',
-					},
-				],
-			},
 		];
 	},
 
-	// ENHANCED: Better image optimization for offline
 	images: {
 		unoptimized: true,
-		formats: ['image/webp', 'image/avif'],
-		deviceSizes: [640, 750, 828, 1080, 1200, 1920],
-		imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-	},
-
-	// ENHANCED: Redirects for better offline handling
-	async redirects() {
-		return [
-			{
-				source: '/home',
-				destination: '/dashboard',
-				permanent: true,
-			},
-			// Add more redirects as needed
-		];
-	},
-
-	// ENHANCED: Rewrites for offline API fallbacks
-	async rewrites() {
-		return {
-			beforeFiles: [],
-			afterFiles: [
-				// Offline API fallbacks
-				{
-					source: '/api/offline/:path*',
-					destination: '/api/offline',
-				},
-			],
-			fallback: [],
-		};
 	},
 };
 
