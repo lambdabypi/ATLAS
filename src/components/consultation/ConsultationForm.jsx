@@ -301,8 +301,8 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 									type="button"
 									onClick={() => setFormExpanded(false)}
 									className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${!formExpanded
-											? 'bg-white shadow text-blue-600'
-											: 'text-gray-600 hover:text-gray-900'
+										? 'bg-white shadow text-blue-600'
+										: 'text-gray-600 hover:text-gray-900'
 										}`}
 								>
 									Quick Form
@@ -311,8 +311,8 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 									type="button"
 									onClick={() => setFormExpanded(true)}
 									className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${formExpanded
-											? 'bg-white shadow text-blue-600'
-											: 'text-gray-600 hover:text-gray-900'
+										? 'bg-white shadow text-blue-600'
+										: 'text-gray-600 hover:text-gray-900'
 										}`}
 								>
 									Comprehensive
@@ -364,8 +364,8 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 
 					{/* Main Content - Dynamic Layout */}
 					<div className={`transition-all duration-300 ${formExpanded && smartGuidelines?.recommendations
-							? 'mr-84' // Make room for floating guidelines
-							: ''
+						? 'mr-84' // Make room for floating guidelines
+						: ''
 						}`}>
 						{/* Clinical Assessment Form */}
 						<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

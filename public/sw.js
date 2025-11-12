@@ -1,4 +1,4 @@
-// public/sw.js - TARGETED FIX for Query Parameter Caching
+// public/sw.js - TARGETED FIX for Query Parameter Cachings
 const CACHE_NAME = 'atlas-critical-v1';
 const OFFLINE_FALLBACK = '/offline.html';
 
