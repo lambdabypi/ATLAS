@@ -403,8 +403,12 @@ export default function Home() {
 					{/* Streamlined Header with proper centering */}
 					<header className="atlas-header-center mb-16">
 						<div className="inline-flex items-center gap-4 mb-6">
-							<div className="atlas-logo w-14 h-14 flex items-center justify-center">
-								<span className="text-white font-bold text-2xl">A</span>
+							<div className="w-14 h-14 flex items-center justify-center">
+								<img
+									src="/icons/ATLAS Logo.png"
+									alt="ATLAS Logo"
+									className="w-full h-full object-contain"
+								/>
 							</div>
 							<h1 className="atlas-title text-6xl">
 								ATLAS

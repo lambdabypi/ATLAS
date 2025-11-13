@@ -62,8 +62,12 @@ export const UserSelection = ({ onUserSelected }) => {
 			{/* Fixed: Replace atlas-page-container with proper centering */}
 			<div className="min-h-screen flex flex-col items-center justify-center p-4">
 				<div className="text-center mb-8">
-					<div className="atlas-logo w-16 h-16 mx-auto mb-4">
-						<span className="text-white font-bold text-3xl">A</span>
+					<div className="w-16 h-16 mx-auto mb-4">
+						<img
+							src="/icons/ATLAS Logo.png"
+							alt="ATLAS Logo"
+							className="w-full h-full object-contain"
+						/>
 					</div>
 					<h1 className="text-4xl font-bold text-gray-800 mb-2">ATLAS</h1>
 					<p className="text-gray-600">Select your user profile to continue</p>
