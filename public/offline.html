@@ -1,11 +1,10 @@
-<!-- public/offline.html - ENHANCED with Reload Support -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>ATLAS - Offline Mode</title>
+	<meta charset="utf-8">
+	<title>ATLAS - Offline</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<style>
 		* {
 			margin: 0;
@@ -16,375 +15,75 @@
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: white;
 			min-height: 100vh;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			color: #333;
-		}
-
-		.offline-container {
-			background: white;
-			border-radius: 20px;
-			padding: 3rem;
 			text-align: center;
-			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+			padding: 20px;
+		}
+
+		.container {
+			background: rgba(255, 255, 255, 0.1);
+			padding: 2rem;
+			border-radius: 1rem;
+			backdrop-filter: blur(10px);
 			max-width: 500px;
-			width: 90%;
+			width: 100%;
 		}
 
-		.atlas-logo {
-			width: 80px;
-			height: 80px;
-			background: linear-gradient(135deg, #667eea, #764ba2);
-			border-radius: 20px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			margin: 0 auto 2rem;
-			font-size: 2rem;
-			font-weight: bold;
-			color: white;
-			animation: pulse 2s infinite;
-		}
-
-		@keyframes pulse {
-
-			0%,
-			100% {
-				opacity: 1;
-				transform: scale(1);
-			}
-
-			50% {
-				opacity: 0.8;
-				transform: scale(0.95);
-			}
+		.logo {
+			font-size: 4rem;
+			margin-bottom: 1rem;
 		}
 
 		h1 {
-			color: #1a202c;
 			margin-bottom: 1rem;
 			font-size: 2rem;
 		}
 
-		.status-message {
-			color: #4a5568;
-			margin-bottom: 2rem;
+		p {
+			margin-bottom: 1rem;
+			opacity: 0.9;
 			line-height: 1.6;
 		}
 
-		.reload-info {
-			background: #fef3c7;
-			border: 1px solid #f59e0b;
-			border-radius: 12px;
-			padding: 1rem;
-			margin: 2rem 0;
-			color: #92400e;
-		}
-
-		.reload-info strong {
-			display: block;
-			margin-bottom: 0.5rem;
-		}
-
-		.available-features {
-			background: #f0f9ff;
-			border-radius: 12px;
-			padding: 1.5rem;
-			margin: 2rem 0;
-			text-align: left;
-		}
-
-		.feature-list {
-			list-style: none;
-		}
-
-		.feature-list li {
-			display: flex;
-			align-items: center;
-			margin-bottom: 0.75rem;
-			color: #1e40af;
-		}
-
-		.feature-list li:before {
-			content: "✅";
-			margin-right: 0.75rem;
-			font-size: 1.2rem;
-		}
-
-		.button-group {
-			display: flex;
-			gap: 1rem;
-			flex-wrap: wrap;
-			justify-content: center;
-			margin: 2rem 0;
-		}
-
-		.retry-button {
-			background: linear-gradient(135deg, #667eea, #764ba2);
-			color: white;
-			border: none;
-			padding: 1rem 2rem;
-			border-radius: 12px;
-			font-size: 1rem;
-			font-weight: 600;
-			cursor: pointer;
-			transition: transform 0.2s, box-shadow 0.2s;
-			flex: 1;
-			min-width: 140px;
-		}
-
-		.retry-button:hover {
-			transform: translateY(-2px);
-			box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-		}
-
-		.retry-button:disabled {
-			opacity: 0.6;
-			cursor: not-allowed;
-			transform: none;
-		}
-
-		.dashboard-button {
-			background: transparent;
-			color: #667eea;
-			border: 2px solid #667eea;
-			padding: 1rem 2rem;
-			border-radius: 12px;
-			font-size: 1rem;
-			cursor: pointer;
-			transition: all 0.2s;
-			text-decoration: none;
+		.btn {
 			display: inline-block;
-			flex: 1;
-			min-width: 140px;
-		}
-
-		.dashboard-button:hover {
-			background: #667eea;
+			margin: 0.5rem;
+			padding: 1rem 2rem;
+			background: rgba(255, 255, 255, 0.2);
 			color: white;
+			text-decoration: none;
+			border-radius: 0.5rem;
+			border: 1px solid rgba(255, 255, 255, 0.3);
+			transition: all 0.2s;
 		}
 
-		.network-status {
-			margin-top: 2rem;
-			padding: 1rem;
-			border-radius: 8px;
-			font-size: 0.9rem;
-		}
-
-		.network-status.offline {
-			background: #fed7d7;
-			color: #c53030;
-		}
-
-		.network-status.online {
-			background: #c6f6d5;
-			color: #2f855a;
-		}
-
-		.debug-info {
-			margin-top: 2rem;
-			padding: 1rem;
-			background: #f7fafc;
-			border-radius: 8px;
-			font-size: 0.8rem;
-			color: #4a5568;
-			text-align: left;
-		}
-
-		@media (max-width: 640px) {
-			.offline-container {
-				padding: 2rem 1.5rem;
-			}
-
-			.button-group {
-				flex-direction: column;
-			}
-
-			.retry-button,
-			.dashboard-button {
-				width: 100%;
-				flex: none;
-			}
+		.btn:hover {
+			background: rgba(255, 255, 255, 0.3);
 		}
 	</style>
 </head>
 
 <body>
-	<div class="offline-container">
-		<div class="atlas-logo">A</div>
-
-		<h1>ATLAS Offline Mode</h1>
-
-		<p class="status-message">
-			You're currently offline, but ATLAS continues to provide essential clinical support using cached data and
-			local intelligence.
-		</p>
-
-		<div class="reload-info" id="reloadInfo" style="display: none;">
-			<strong>Page Reload Detected</strong>
-			Some features may be limited due to offline reload. Try the dashboard link below for full offline
-			functionality.
+	<div class="container">
+		<div class="logo">🏥</div>
+		<h1>ATLAS Offline</h1>
+		<p>You're currently offline. Some pages are available for offline use:</p>
+		<div style="margin-top: 2rem;">
+			<a href="/dashboard" class="btn">Dashboard</a>
+			<a href="/patients" class="btn">Patients</a>
+			<a href="/consultation/new" class="btn">New Consultation</a>
 		</div>
-
-		<div class="available-features">
-			<h3 style="margin-bottom: 1rem; color: #1e40af;">Available Features:</h3>
-			<ul class="feature-list">
-				<li>Access cached patient records</li>
-				<li>View clinical guidelines</li>
-				<li>Create offline consultations</li>
-				<li>Use local AI decision support</li>
-				<li>Browse reference materials</li>
-			</ul>
-		</div>
-
-		<div class="button-group">
-			<button class="retry-button" onclick="retryConnection()" id="retryBtn">
-				🔄 Retry Connection
-			</button>
-			<a href="/dashboard" class="dashboard-button">
-				📊 Go to Dashboard
-			</a>
-		</div>
-
-		<div class="network-status offline" id="networkStatus">
-			📡 Offline Mode - Will sync when connection is restored
-		</div>
-
-		<div class="debug-info" id="debugInfo">
-			<strong>Debug Info:</strong><br>
-			URL: <span id="currentUrl"></span><br>
-			Referrer: <span id="referrerInfo"></span><br>
-			Cache Available: <span id="cacheStatus"></span>
-		</div>
+		<button onclick="location.reload()" class="btn" style="margin-top: 1rem;">
+			Retry Connection
+		</button>
 	</div>
-
 	<script>
-		// ENHANCED: Better reload detection and handling
-		function initializeOfflinePage() {
-			// Debug info
-			document.getElementById('currentUrl').textContent = window.location.href;
-			document.getElementById('referrerInfo').textContent = document.referrer || 'Direct access';
-			document.getElementById('cacheStatus').textContent = 'caches' in window ? 'Yes' : 'No';
-
-			// Detect if this was a reload while offline
-			const wasReload = document.referrer === window.location.href ||
-				sessionStorage.getItem('atlas_offline_reload') === 'true';
-
-			if (wasReload) {
-				document.getElementById('reloadInfo').style.display = 'block';
-				sessionStorage.setItem('atlas_offline_reload', 'true');
-			}
-		}
-
-		// Network status monitoring
-		function updateNetworkStatus() {
-			const status = document.getElementById('networkStatus');
-			const retryBtn = document.getElementById('retryBtn');
-
-			if (navigator.onLine) {
-				status.className = 'network-status online';
-				status.innerHTML = '🌐 Connection restored - Ready to sync';
-				retryBtn.disabled = false;
-
-				// Clear reload flag
-				sessionStorage.removeItem('atlas_offline_reload');
-
-				// Auto-reload when back online
-				setTimeout(() => {
-					window.location.href = '/dashboard';
-				}, 2000);
-			} else {
-				status.className = 'network-status offline';
-				status.innerHTML = '📡 Offline Mode - Will sync when connection is restored';
-			}
-		}
-
-		// Retry connection with better error handling
-		function retryConnection() {
-			const button = document.getElementById('retryBtn');
-			button.innerHTML = '🔄 Checking...';
-			button.disabled = true;
-
-			// Test multiple endpoints
-			const testEndpoints = [
-				window.location.origin + '/',
-				window.location.origin + '/dashboard',
-				'https://www.google.com/favicon.ico'
-			];
-
-			Promise.race(testEndpoints.map(url =>
-				fetch(url, {
-					method: 'HEAD',
-					mode: 'no-cors',
-					cache: 'no-cache',
-					signal: AbortSignal.timeout(3000)
-				})
-			)).then(() => {
-				button.innerHTML = '✅ Connected!';
-				sessionStorage.removeItem('atlas_offline_reload');
-				setTimeout(() => {
-					window.location.href = '/dashboard';
-				}, 1000);
-			}).catch(() => {
-				button.innerHTML = '❌ Still Offline';
-				setTimeout(() => {
-					button.innerHTML = '🔄 Retry Connection';
-					button.disabled = false;
-				}, 2000);
-			});
-		}
-
-		// FIXED: Service Worker communication for better offline handling
-		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.ready.then(reg => {
-				console.log('SW ready, requesting cache status...');
-
-				// Request cache status from service worker
-				if (reg.active) {
-					const channel = new MessageChannel();
-					channel.port1.onmessage = (event) => {
-						console.log('SW cache status:', event.data);
-					};
-					reg.active.postMessage({
-						type: 'GET_CACHE_STATUS'
-					}, [channel.port2]);
-				}
-			});
-		}
-
-		// Initialize page
-		initializeOfflinePage();
-		updateNetworkStatus();
-
-		// Event listeners
-		window.addEventListener('online', updateNetworkStatus);
-		window.addEventListener('offline', updateNetworkStatus);
-
-		// Auto-retry every 30 seconds when offline
-		setInterval(() => {
-			if (!navigator.onLine) {
-				fetch(window.location.origin, {
-					method: 'HEAD',
-					cache: 'no-cache',
-					signal: AbortSignal.timeout(2000)
-				}).then(() => {
-					updateNetworkStatus();
-				}).catch(() => {
-					// Still offline - do nothing
-				});
-			}
-		}, 30000);
-
-		// Keyboard shortcuts
-		document.addEventListener('keydown', (e) => {
-			if (e.altKey && !e.ctrlKey && !e.metaKey) {
-				switch (e.key.toLowerCase()) {
-					case 'd': window.location.href = '/dashboard'; break;
-					case 'r': retryConnection(); break;
-				}
-			}
+		window.addEventListener('online', () => {
+			setTimeout(() => location.reload(), 1000);
 		});
 	</script>
 </body>

@@ -1,4 +1,4 @@
-// src/app/layout.js - Coordinated with single service worker
+// src/app/layout.js - Improved with SW communication
 'use client';
 
 import { useEffect } from 'react';
@@ -19,32 +19,44 @@ export default function RootLayout({ children }) {
 			if (isInitialized) return;
 			isInitialized = true;
 
-			console.log('🏥 Initializing ATLAS offline support...');
+			console.log('🏥 ATLAS: Initializing offline support...');
 
-			// Step 1: Request persistent storage
-			await requestPersistentStorage();
+			try {
+				// Step 1: Request persistent storage
+				await requestPersistentStorage();
 
-			// Step 2: Wait for service worker to be ready
-			await waitForServiceWorker();
+				// Step 2: Register and wait for service worker
+				const registration = await registerServiceWorker();
 
-			// Step 3: Pre-cache critical pages (after SW is ready)
-			setTimeout(() => preCacheCriticalPages(), 2000);
+				if (registration) {
+					// Step 3: Wait for SW to be ready and controlling
+					await waitForServiceWorkerControl();
 
-			// Step 4: Setup monitoring
-			setupOfflineMonitoring();
+					// Step 4: Pre-cache critical pages via SW
+					await preCacheCriticalPages();
+
+					// Step 5: Setup monitoring
+					setupOfflineMonitoring();
+
+					console.log('✅ ATLAS: Offline support fully initialized');
+				} else {
+					console.warn('⚠️ ATLAS: Running without offline support');
+				}
+			} catch (error) {
+				console.error('❌ ATLAS: Offline support initialization failed:', error);
+			}
 		};
 
 		initializeOfflineSupport();
 
 		// Network event handlers
 		const handleOnline = () => {
-			console.log('🟢 Back online');
-			// Trigger sync or refresh if needed
+			console.log('🟢 ATLAS: Back online - refreshing cache');
 			setTimeout(() => preCacheCriticalPages(), 1000);
 		};
 
 		const handleOffline = () => {
-			console.log('🔴 Offline mode');
+			console.log('🔴 ATLAS: Offline mode activated');
 		};
 
 		window.addEventListener('online', handleOnline);
@@ -64,7 +76,6 @@ export default function RootLayout({ children }) {
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
 				<meta name="theme-color" content="#667eea" />
 
-				{/* PWA meta tags */}
 				<meta name="application-name" content="ATLAS Clinical" />
 				<meta name="apple-mobile-web-app-capable" content="yes" />
 				<meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -83,7 +94,9 @@ export default function RootLayout({ children }) {
 	);
 }
 
-// Request persistent storage
+// ============================================================================
+// Storage Persistence
+// ============================================================================
 async function requestPersistentStorage() {
 	try {
 		if ('storage' in navigator && 'persist' in navigator.storage) {
@@ -91,21 +104,17 @@ async function requestPersistentStorage() {
 
 			if (!isPersisted) {
 				const granted = await navigator.storage.persist();
-				if (granted) {
-					console.log('✅ Persistent storage GRANTED');
-				} else {
-					console.warn('⚠️ Persistent storage DENIED');
-				}
+				console.log(granted ? '✅ Persistent storage GRANTED' : '⚠️ Persistent storage DENIED');
 			} else {
 				console.log('✅ Already have persistent storage');
 			}
 
-			// Check quota
 			if ('estimate' in navigator.storage) {
 				const estimate = await navigator.storage.estimate();
 				const usedMB = (estimate.usage / 1024 / 1024).toFixed(2);
 				const totalMB = (estimate.quota / 1024 / 1024).toFixed(2);
-				console.log(`📊 Storage: ${usedMB}MB / ${totalMB}MB`);
+				const percentUsed = ((estimate.usage / estimate.quota) * 100).toFixed(1);
+				console.log(`📊 Storage: ${usedMB}MB / ${totalMB}MB (${percentUsed}% used)`);
 			}
 		}
 	} catch (error) {
@@ -113,164 +122,300 @@ async function requestPersistentStorage() {
 	}
 }
 
-// Wait for service worker to be ready and controlling
-async function waitForServiceWorker() {
+// ============================================================================
+// Service Worker Registration
+// ============================================================================
+async function registerServiceWorker() {
 	if (!('serviceWorker' in navigator)) {
-		console.warn('⚠️ Service Worker not supported');
-		return false;
+		console.warn('⚠️ Service Worker not supported in this browser');
+		return null;
 	}
 
 	try {
-		// Wait for registration
-		const registration = await navigator.serviceWorker.ready;
-		console.log('✅ Service Worker ready');
+		const registration = await navigator.serviceWorker.register('/sw.js', {
+			scope: '/',
+		});
 
-		// Check if SW is controlling the page
-		if (!navigator.serviceWorker.controller) {
-			console.log('⏳ Waiting for SW to control page...');
+		console.log('✅ Service Worker registered');
 
-			// Wait for SW to take control
-			await new Promise((resolve) => {
-				navigator.serviceWorker.addEventListener('controllerchange', () => {
-					console.log('✅ Service Worker now controlling page');
-					resolve();
-				});
+		// Listen for updates
+		registration.addEventListener('updatefound', () => {
+			const newWorker = registration.installing;
+			console.log('🔄 Service Worker update found');
 
-				// Timeout after 5 seconds
-				setTimeout(() => {
-					console.warn('⚠️ SW control timeout - continuing anyway');
-					resolve();
-				}, 5000);
+			newWorker.addEventListener('statechange', () => {
+				if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+					console.log('🆕 New version available');
+					// Optionally notify user to refresh
+					if (confirm('A new version of ATLAS is available. Reload now?')) {
+						window.location.reload();
+					}
+				}
 			});
-		} else {
-			console.log('✅ Service Worker already controlling page');
-		}
+		});
 
 		return registration;
-
 	} catch (error) {
-		console.error('❌ Service Worker initialization error:', error);
-		return false;
+		console.error('❌ Service Worker registration failed:', error);
+		return null;
 	}
 }
 
-// Pre-cache critical pages for offline access
+// ============================================================================
+// Wait for Service Worker Control
+// ============================================================================
+async function waitForServiceWorkerControl() {
+	if (!navigator.serviceWorker.controller) {
+		console.log('⏳ Waiting for Service Worker to take control...');
+
+		await new Promise((resolve) => {
+			const timeout = setTimeout(() => {
+				console.warn('⚠️ Service Worker control timeout (continuing anyway)');
+				resolve();
+			}, 10000); // 10 second timeout
+
+			navigator.serviceWorker.addEventListener('controllerchange', () => {
+				clearTimeout(timeout);
+				console.log('✅ Service Worker now controlling page');
+				resolve();
+			}, { once: true });
+
+			// If already controlling, resolve immediately
+			if (navigator.serviceWorker.controller) {
+				clearTimeout(timeout);
+				resolve();
+			}
+		});
+	} else {
+		console.log('✅ Service Worker already controlling page');
+	}
+}
+
+// ============================================================================
+// Pre-cache Critical Pages via Service Worker
+// ============================================================================
 async function preCacheCriticalPages() {
-	if (!('caches' in window)) {
-		console.warn('⚠️ Cache API not supported');
+	if (!navigator.onLine) {
+		console.log('📱 Offline - skipping pre-cache');
 		return;
 	}
 
-	if (!navigator.onLine) {
-		console.log('📱 Offline - skipping pre-cache');
+	if (!navigator.serviceWorker.controller) {
+		console.warn('⚠️ Service Worker not controlling - cannot pre-cache');
 		return;
 	}
 
 	try {
 		console.log('🔄 Pre-caching critical pages...');
 
-		const cache = await caches.open('atlas-pages');
+		// Get all URLs that need to be cached
+		const urlsToCache = getCriticalUrls();
 
-		// Critical pages to cache
-		const urlsToCache = [
-			'/',
-			'/dashboard',
-			'/patients',
-			'/patients/add',
-			'/consultation/new',
-			'/reference',
+		// Send cache request to service worker
+		const messageChannel = new MessageChannel();
 
-			// Dynamic URLs that might be accessed
-			'/consultation/new?patientId=1',
-			'/consultation/new?patientId=2',
-			'/consultation/new?mode=enhanced',
-			'/patients/1',
-			'/patients/2',
-		];
+		const cachePromise = new Promise((resolve) => {
+			messageChannel.port1.onmessage = (event) => {
+				resolve(event.data);
+			};
+		});
 
-		let cached = 0;
-		let failed = 0;
+		navigator.serviceWorker.controller.postMessage(
+			{
+				type: 'CACHE_URLS',
+				urls: urlsToCache,
+			},
+			[messageChannel.port2]
+		);
 
-		for (const url of urlsToCache) {
-			try {
-				const fullUrl = window.location.origin + url;
+		// Wait for confirmation (with timeout)
+		const timeoutPromise = new Promise((resolve) =>
+			setTimeout(() => resolve({ timeout: true }), 30000)
+		);
 
-				// Check if already cached
-				const existing = await cache.match(fullUrl);
-				if (existing) {
-					console.log('✓ Already cached:', url);
-					continue;
-				}
+		await Promise.race([cachePromise, timeoutPromise]);
 
-				// Fetch and cache
-				const response = await fetch(fullUrl, {
-					cache: 'no-cache',
-					credentials: 'same-origin'
-				});
+		// Verify cached URLs
+		await verifyCachedUrls();
 
-				if (response.ok) {
-					await cache.put(fullUrl, response.clone());
-					console.log('✓ Cached:', url);
-					cached++;
-				} else {
-					console.warn('✗ Failed:', url, response.status);
-					failed++;
-				}
-
-			} catch (error) {
-				console.warn('✗ Error caching:', url, error.message);
-				failed++;
-			}
-		}
-
-		console.log(`✅ Pre-cache complete: ${cached} cached, ${failed} failed`);
-
-		// CRITICAL: Verify the problematic URL
-		const testUrl = window.location.origin + '/consultation/new?patientId=1';
-		const testResponse = await cache.match(testUrl);
-
-		if (testResponse) {
-			console.log('✅ VERIFIED: /consultation/new?patientId=1 is cached');
-		} else {
-			console.error('❌ CRITICAL: /consultation/new?patientId=1 NOT cached');
-		}
+		console.log('✅ Pre-cache complete');
 
 	} catch (error) {
 		console.error('❌ Pre-cache error:', error);
 	}
 }
 
-// Setup offline monitoring
-function setupOfflineMonitoring() {
-	// Log network status changes
-	console.log(`📡 Network status: ${navigator.onLine ? 'Online' : 'Offline'}`);
+// ============================================================================
+// Get Critical URLs to Cache
+// ============================================================================
+function getCriticalUrls() {
+	const baseUrls = [
+		'/',
+		'/dashboard',
+		'/patients',
+		'/patients/add',
+		'/patients/new',
+		'/consultation/new',
+		'/reference',
+		'/guidelines',
+	];
 
-	// Monitor cache size periodically
+	// Add dynamic patient URLs (1-10)
+	const patientUrls = Array.from(
+		{ length: 10 },
+		(_, i) => `/patients/${i + 1}`
+	);
+
+	// Add consultation URLs with patient IDs (1-10)
+	const consultationUrls = Array.from(
+		{ length: 10 },
+		(_, i) => `/consultation/new?patientId=${i + 1}`
+	);
+
+	// Add enhanced mode
+	const enhancedUrls = [
+		'/consultation/new?mode=enhanced',
+		'/consultation/new?mode=enhanced&patientId=1',
+	];
+
+	return [
+		...baseUrls,
+		...patientUrls,
+		...consultationUrls,
+		...enhancedUrls,
+	].map(url => {
+		// Convert relative URLs to absolute
+		return new URL(url, window.location.origin).href;
+	});
+}
+
+// ============================================================================
+// Verify Cached URLs
+// ============================================================================
+async function verifyCachedUrls() {
+	try {
+		const cache = await caches.open('atlas-pages-v1');
+		const cachedRequests = await cache.keys();
+		const cachedUrls = cachedRequests.map(req => req.url);
+
+		console.log(`📋 Total cached pages: ${cachedUrls.length}`);
+
+		// Test critical URLs
+		const testUrls = [
+			'/consultation/new?patientId=1',
+			'/consultation/new?patientId=2',
+			'/patients/1',
+			'/dashboard',
+		];
+
+		console.log('🔍 Verifying critical URLs...');
+
+		for (const testUrl of testUrls) {
+			const fullUrl = new URL(testUrl, window.location.origin).href;
+			const response = await cache.match(fullUrl, { ignoreSearch: false });
+
+			if (response) {
+				console.log('✅ VERIFIED:', testUrl);
+			} else {
+				console.error('❌ NOT CACHED:', testUrl);
+			}
+		}
+	} catch (error) {
+		console.warn('⚠️ Could not verify cache:', error);
+	}
+}
+
+// ============================================================================
+// Offline Monitoring
+// ============================================================================
+function setupOfflineMonitoring() {
+	console.log(`📡 Network: ${navigator.onLine ? 'Online' : 'Offline'}`);
+
+	// Monitor storage usage
 	if ('storage' in navigator && 'estimate' in navigator.storage) {
-		setInterval(async () => {
+		const checkStorage = async () => {
 			try {
 				const estimate = await navigator.storage.estimate();
-				const percentUsed = (estimate.usage / estimate.quota * 100).toFixed(1);
+				const percentUsed = ((estimate.usage / estimate.quota) * 100).toFixed(1);
 
 				if (percentUsed > 80) {
-					console.warn(`⚠️ Storage ${percentUsed}% full`);
+					console.warn(`⚠️ Storage ${percentUsed}% full - consider clearing old cache`);
 				}
 			} catch (error) {
-				// Silently fail
+				// Silent fail
 			}
-		}, 60000); // Check every minute
+		};
+
+		// Check immediately and then every 5 minutes
+		checkStorage();
+		setInterval(checkStorage, 5 * 60 * 1000);
 	}
 
-	// Debug: List cached URLs (dev mode only)
+	// Debug cache contents in development
 	if (process.env.NODE_ENV === 'development') {
 		setTimeout(async () => {
 			try {
-				const cache = await caches.open('atlas-pages');
-				const requests = await cache.keys();
-				console.log('📋 Cached pages:', requests.map(r => r.url));
+				console.log('📦 Cache Debug Info:');
+				const cacheNames = await caches.keys();
+
+				for (const cacheName of cacheNames) {
+					const cache = await caches.open(cacheName);
+					const requests = await cache.keys();
+					console.log(`  ${cacheName}: ${requests.length} items`);
+
+					// Show first 5 URLs
+					requests.slice(0, 5).forEach(req => {
+						console.log(`    - ${req.url}`);
+					});
+
+					if (requests.length > 5) {
+						console.log(`    ... and ${requests.length - 5} more`);
+					}
+				}
 			} catch (error) {
 				console.warn('Could not list cache:', error);
 			}
-		}, 3000);
+		}, 5000);
 	}
+}
+
+// ============================================================================
+// Export utility functions for use elsewhere
+// ============================================================================
+if (typeof window !== 'undefined') {
+	window.atlasOffline = {
+		getCacheStatus: async () => {
+			const cacheNames = await caches.keys();
+			const status = {};
+
+			for (const cacheName of cacheNames) {
+				const cache = await caches.open(cacheName);
+				const keys = await cache.keys();
+				status[cacheName] = keys.length;
+			}
+
+			return status;
+		},
+
+		clearAllCaches: async () => {
+			const cacheNames = await caches.keys();
+			await Promise.all(cacheNames.map(name => caches.delete(name)));
+			console.log('✅ All caches cleared');
+			alert('All caches cleared. Refresh to rebuild.');
+		},
+
+		testOfflineUrl: async (url) => {
+			const fullUrl = new URL(url, window.location.origin).href;
+			const cache = await caches.open('atlas-pages-v1');
+			const response = await cache.match(fullUrl, { ignoreSearch: false });
+
+			if (response) {
+				console.log('✅ URL is cached:', url);
+				return true;
+			} else {
+				console.log('❌ URL NOT cached:', url);
+				return false;
+			}
+		},
+	};
 }
