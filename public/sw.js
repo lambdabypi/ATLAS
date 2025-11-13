@@ -1,180 +1,35 @@
-// public/sw.js - Improved Service Worker with robust offline handling
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+// public/sw.js - SIMPLIFIED WITHOUT PRECACHING
+const CACHE_VERSION = 'v2'; // Increment to force update
+const CACHE_NAMES = {
+	pages: `atlas-pages-${CACHE_VERSION}`,
+	api: `atlas-api-${CACHE_VERSION}`,
+	static: `atlas-static-${CACHE_VERSION}`,
+	assets: `atlas-assets-${CACHE_VERSION}`,
+};
 
-const CACHE_VERSION = 'v1';
-const PAGE_CACHE = 'atlas-pages-v1';
-const API_CACHE = 'atlas-api-v1';
-const STATIC_CACHE = 'next-static-v1';
-const ASSET_CACHE = 'atlas-assets-v1';
+// List of all current caches
+const ALL_CACHES = Object.values(CACHE_NAMES);
 
-// Configure Workbox
-workbox.setConfig({ debug: false });
-workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
-
-// ============================================================================
-// STRATEGY 1: HTML Pages - Network First with Smart Fallbacks
-// ============================================================================
-workbox.routing.registerRoute(
-	({ request, url }) => {
-		return request.mode === 'navigate' ||
-			request.destination === 'document';
-	},
-	async ({ request, event }) => {
-		const cache = await caches.open(PAGE_CACHE);
-		const url = new URL(request.url);
-
-		console.log('📄 Navigation request:', url.href);
-
-		// STEP 1: Try network first (with timeout)
-		try {
-			const networkPromise = fetch(request);
-			const timeoutPromise = new Promise((_, reject) =>
-				setTimeout(() => reject(new Error('Network timeout')), 3000)
-			);
-
-			const response = await Promise.race([networkPromise, timeoutPromise]);
-
-			if (response.ok) {
-				console.log('✅ Serving from network:', url.href);
-				// Cache the response for next time
-				cache.put(request.url, response.clone());
-				return response;
-			}
-		} catch (error) {
-			console.log('❌ Network failed:', error.message);
-		}
-
-		// STEP 2: Try exact cache match (including query params)
-		try {
-			const cachedResponse = await cache.match(request.url, {
-				ignoreSearch: false // Must match query params exactly
-			});
-
-			if (cachedResponse) {
-				console.log('✅ Serving from cache (exact match):', url.href);
-				return cachedResponse;
-			}
-		} catch (error) {
-			console.log('❌ Cache match failed:', error);
-		}
-
-		// STEP 3: Smart fallback chain for consultation URLs
-		if (url.pathname === '/consultation/new' && url.searchParams.has('patientId')) {
-			console.log('🔄 Trying consultation fallbacks...');
-
-			// Try: Same URL without query params
-			const baseUrl = `${url.origin}${url.pathname}`;
-			const baseResponse = await cache.match(baseUrl);
-			if (baseResponse) {
-				console.log('✅ Using base consultation page');
-				return baseResponse;
-			}
-		}
-
-		// STEP 4: Generic fallback chain
-		const fallbacks = [
-			`${url.origin}${url.pathname}`, // Same path, no query params
-			`${url.origin}/dashboard`,
-			`${url.origin}/`,
-		];
-
-		for (const fallbackUrl of fallbacks) {
-			const fallbackResponse = await cache.match(fallbackUrl);
-			if (fallbackResponse) {
-				console.log('✅ Using fallback:', fallbackUrl);
-				return fallbackResponse;
-			}
-		}
-
-		// STEP 5: Return offline page
-		console.log('📵 No cache available - showing offline page');
-		return generateOfflinePage(url);
-	}
-);
+console.log('🔧 [SW] Loading service worker...');
 
 // ============================================================================
-// STRATEGY 2: API Requests - Network First with JSON Error Fallback
-// ============================================================================
-workbox.routing.registerRoute(
-	({ url }) => url.pathname.startsWith('/api/'),
-	new workbox.strategies.NetworkFirst({
-		cacheName: API_CACHE,
-		networkTimeoutSeconds: 5,
-		plugins: [
-			new workbox.expiration.ExpirationPlugin({
-				maxEntries: 100,
-				maxAgeSeconds: 5 * 60,
-			}),
-			{
-				handlerDidError: async ({ request }) => {
-					console.log('❌ API request failed offline:', request.url);
-					return new Response(
-						JSON.stringify({
-							error: 'offline',
-							message: 'API not available offline',
-							offline: true,
-						}),
-						{
-							status: 503,
-							headers: {
-								'Content-Type': 'application/json',
-								'X-Offline': 'true'
-							},
-						}
-					);
-				},
-			},
-		],
-	})
-);
-
-// ============================================================================
-// STRATEGY 3: Next.js Static Files - Cache First
-// ============================================================================
-workbox.routing.registerRoute(
-	({ url }) => url.pathname.startsWith('/_next/static/'),
-	new workbox.strategies.CacheFirst({
-		cacheName: STATIC_CACHE,
-		plugins: [
-			new workbox.expiration.ExpirationPlugin({
-				maxEntries: 200,
-				maxAgeSeconds: 365 * 24 * 60 * 60,
-			}),
-		],
-	})
-);
-
-// ============================================================================
-// STRATEGY 4: Assets - Cache First
-// ============================================================================
-workbox.routing.registerRoute(
-	({ request }) => {
-		return request.destination === 'image' ||
-			request.destination === 'font' ||
-			request.destination === 'style' ||
-			request.destination === 'script';
-	},
-	new workbox.strategies.CacheFirst({
-		cacheName: ASSET_CACHE,
-		plugins: [
-			new workbox.expiration.ExpirationPlugin({
-				maxEntries: 100,
-				maxAgeSeconds: 30 * 24 * 60 * 60,
-			}),
-		],
-	})
-);
-
-// ============================================================================
-// Install Handler - Immediate Activation
+// Install - Skip Waiting Immediately
 // ============================================================================
 self.addEventListener('install', (event) => {
 	console.log('🔧 [SW] Installing...');
-	self.skipWaiting(); // Activate immediately
+
+	// CRITICAL: Skip waiting to activate immediately
+	self.skipWaiting();
+
+	event.waitUntil(
+		caches.open(CACHE_NAMES.pages).then(() => {
+			console.log('✅ [SW] Cache initialized');
+		})
+	);
 });
 
 // ============================================================================
-// Activate Handler - Clean Old Caches & Take Control
+// Activate - Take Control Immediately
 // ============================================================================
 self.addEventListener('activate', (event) => {
 	console.log('✅ [SW] Activating...');
@@ -185,65 +40,228 @@ self.addEventListener('activate', (event) => {
 			const cacheNames = await caches.keys();
 			await Promise.all(
 				cacheNames
-					.filter(name => {
-						const isOldCache = name.startsWith('atlas-') &&
-							!name.includes(CACHE_VERSION) &&
-							![PAGE_CACHE, API_CACHE, STATIC_CACHE, ASSET_CACHE].includes(name);
-						if (isOldCache) {
-							console.log('🗑️ Deleting old cache:', name);
-						}
-						return isOldCache;
+					.filter(name => name.startsWith('atlas-') && !ALL_CACHES.includes(name))
+					.map(name => {
+						console.log('🗑️ [SW] Deleting old cache:', name);
+						return caches.delete(name);
 					})
-					.map(name => caches.delete(name))
 			);
 
-			// Take control of all pages immediately
+			// CRITICAL: Take control of all pages immediately
 			await self.clients.claim();
 			console.log('✅ [SW] Now controlling all pages');
+
+			// Notify all clients
+			const clients = await self.clients.matchAll({ type: 'window' });
+			clients.forEach(client => {
+				client.postMessage({
+					type: 'SW_READY',
+					caches: CACHE_NAMES,
+				});
+			});
 		})()
 	);
 });
 
 // ============================================================================
-// Fetch Handler - Logging & Diagnostics
+// Fetch - Handle All Requests
 // ============================================================================
 self.addEventListener('fetch', (event) => {
-	const url = new URL(event.request.url);
+	const { request } = event;
+	const url = new URL(request.url);
 
-	// Log navigation requests for debugging
-	if (event.request.mode === 'navigate') {
-		console.log('🧭 [SW] Navigation:', url.pathname + url.search);
+	// Skip non-GET requests
+	if (request.method !== 'GET') {
+		return;
+	}
+
+	// Skip chrome-extension and other non-http requests
+	if (!url.protocol.startsWith('http')) {
+		return;
+	}
+
+	// Route to appropriate handler
+	if (request.mode === 'navigate') {
+		event.respondWith(handleNavigationRequest(request));
+	} else if (url.pathname.startsWith('/api/')) {
+		event.respondWith(handleApiRequest(request));
+	} else if (url.pathname.startsWith('/_next/static/')) {
+		event.respondWith(handleStaticRequest(request));
+	} else if (isAssetRequest(request)) {
+		event.respondWith(handleAssetRequest(request));
 	}
 });
 
 // ============================================================================
-// Message Handler - Cache Management from Client
+// Handler: Navigation Requests (HTML pages)
+// ============================================================================
+async function handleNavigationRequest(request) {
+	const cache = await caches.open(CACHE_NAMES.pages);
+
+	try {
+		// Try network first (with timeout)
+		const networkPromise = fetch(request);
+		const timeoutPromise = new Promise((_, reject) =>
+			setTimeout(() => reject(new Error('timeout')), 3000)
+		);
+
+		const response = await Promise.race([networkPromise, timeoutPromise]);
+
+		if (response.ok) {
+			// Cache successful response
+			cache.put(request.url, response.clone());
+			return response;
+		}
+	} catch (error) {
+		console.log('📱 [SW] Network failed, trying cache:', request.url);
+	}
+
+	// Try cache (exact match including query params)
+	let cachedResponse = await cache.match(request.url, { ignoreSearch: false });
+
+	if (cachedResponse) {
+		console.log('✅ [SW] Serving from cache:', request.url);
+		return cachedResponse;
+	}
+
+	// Try without query params
+	const urlWithoutQuery = request.url.split('?')[0];
+	cachedResponse = await cache.match(urlWithoutQuery);
+
+	if (cachedResponse) {
+		console.log('✅ [SW] Serving base page from cache:', urlWithoutQuery);
+		return cachedResponse;
+	}
+
+	// Fallback chain
+	const fallbacks = ['/dashboard', '/'];
+	for (const fallback of fallbacks) {
+		const fallbackUrl = new URL(fallback, self.location.origin).href;
+		const fallbackResponse = await cache.match(fallbackUrl);
+
+		if (fallbackResponse) {
+			console.log('✅ [SW] Using fallback:', fallback);
+			return fallbackResponse;
+		}
+	}
+
+	// Last resort: offline page
+	console.log('📵 [SW] No cache available - generating offline page');
+	return generateOfflinePage(new URL(request.url));
+}
+
+// ============================================================================
+// Handler: API Requests
+// ============================================================================
+async function handleApiRequest(request) {
+	const cache = await caches.open(CACHE_NAMES.api);
+
+	try {
+		const response = await fetch(request);
+
+		if (response.ok) {
+			cache.put(request.url, response.clone());
+		}
+
+		return response;
+	} catch (error) {
+		const cachedResponse = await cache.match(request.url);
+
+		if (cachedResponse) {
+			return cachedResponse;
+		}
+
+		return new Response(
+			JSON.stringify({
+				error: 'offline',
+				message: 'API not available offline',
+			}),
+			{
+				status: 503,
+				headers: { 'Content-Type': 'application/json' },
+			}
+		);
+	}
+}
+
+// ============================================================================
+// Handler: Static Files
+// ============================================================================
+async function handleStaticRequest(request) {
+	const cache = await caches.open(CACHE_NAMES.static);
+
+	// Cache first for static files
+	const cachedResponse = await cache.match(request.url);
+
+	if (cachedResponse) {
+		return cachedResponse;
+	}
+
+	try {
+		const response = await fetch(request);
+
+		if (response.ok) {
+			cache.put(request.url, response.clone());
+		}
+
+		return response;
+	} catch (error) {
+		return new Response('Not found', { status: 404 });
+	}
+}
+
+// ============================================================================
+// Handler: Assets (images, fonts)
+// ============================================================================
+async function handleAssetRequest(request) {
+	const cache = await caches.open(CACHE_NAMES.assets);
+
+	const cachedResponse = await cache.match(request.url);
+
+	if (cachedResponse) {
+		return cachedResponse;
+	}
+
+	try {
+		const response = await fetch(request);
+
+		if (response.ok) {
+			cache.put(request.url, response.clone());
+		}
+
+		return response;
+	} catch (error) {
+		return new Response('Not found', { status: 404 });
+	}
+}
+
+// ============================================================================
+// Helper: Check if Asset Request
+// ============================================================================
+function isAssetRequest(request) {
+	const url = new URL(request.url);
+	return (
+		request.destination === 'image' ||
+		request.destination === 'font' ||
+		/\.(png|jpg|jpeg|svg|gif|webp|ico|woff|woff2|ttf|otf)$/i.test(url.pathname)
+	);
+}
+
+// ============================================================================
+// Message Handler - Cache URLs from Client
 // ============================================================================
 self.addEventListener('message', (event) => {
 	if (event.data && event.data.type === 'CACHE_URLS') {
-		console.log('📥 [SW] Received cache request:', event.data.urls);
 		event.waitUntil(cacheUrls(event.data.urls));
 	}
 
 	if (event.data && event.data.type === 'SKIP_WAITING') {
 		self.skipWaiting();
 	}
-
-	if (event.data && event.data.type === 'GET_CACHE_STATUS') {
-		event.waitUntil(
-			(async () => {
-				const status = await getCacheStatus();
-				event.ports[0].postMessage(status);
-			})()
-		);
-	}
 });
 
-// ============================================================================
-// Helper: Cache URLs from Client
-// ============================================================================
 async function cacheUrls(urls) {
-	const cache = await caches.open(PAGE_CACHE);
+	const cache = await caches.open(CACHE_NAMES.pages);
 	const results = [];
 
 	for (const url of urls) {
@@ -255,15 +273,13 @@ async function cacheUrls(urls) {
 
 			if (response.ok) {
 				await cache.put(url, response.clone());
-				results.push({ url, cached: true });
+				results.push({ url, success: true });
 				console.log('✅ [SW] Cached:', url);
 			} else {
-				results.push({ url, cached: false, status: response.status });
-				console.log('❌ [SW] Failed to cache:', url, response.status);
+				results.push({ url, success: false, status: response.status });
 			}
 		} catch (error) {
-			results.push({ url, cached: false, error: error.message });
-			console.log('❌ [SW] Error caching:', url, error.message);
+			results.push({ url, success: false, error: error.message });
 		}
 	}
 
@@ -271,26 +287,7 @@ async function cacheUrls(urls) {
 }
 
 // ============================================================================
-// Helper: Get Cache Status
-// ============================================================================
-async function getCacheStatus() {
-	const caches_list = await caches.keys();
-	const status = {};
-
-	for (const cacheName of caches_list) {
-		const cache = await caches.open(cacheName);
-		const keys = await cache.keys();
-		status[cacheName] = {
-			count: keys.length,
-			urls: keys.map(req => req.url)
-		};
-	}
-
-	return status;
-}
-
-// ============================================================================
-// Helper: Generate Offline Page
+// Generate Offline Page
 // ============================================================================
 function generateOfflinePage(url) {
 	const html = `
@@ -320,68 +317,38 @@ function generateOfflinePage(url) {
         .url { 
           background: rgba(0,0,0,0.2); padding: 0.5rem; 
           border-radius: 0.5rem; word-break: break-all; 
-          font-size: 0.9rem; margin: 1rem 0;
+          font-size: 0.85rem; margin: 1rem 0;
         }
         .btn { 
-          display: inline-block; margin: 0.5rem; padding: 1rem 2rem; 
+          display: inline-block; margin: 0.5rem; padding: 1rem 1.5rem; 
           background: rgba(255,255,255,0.2); color: white; 
           text-decoration: none; border-radius: 0.5rem; 
           border: 1px solid rgba(255,255,255,0.3);
-          transition: all 0.2s; cursor: pointer;
-          font-size: 1rem; font-family: inherit;
+          transition: all 0.2s; cursor: pointer; font-size: 0.95rem;
         }
         .btn:hover { background: rgba(255,255,255,0.3); }
-        .status { 
-          margin-top: 1.5rem; 
-          padding: 0.75rem; 
-          background: rgba(0,0,0,0.2);
-          border-radius: 0.5rem;
-          font-size: 0.9rem; 
-        }
-        .online { color: #4ade80; }
-        .offline { color: #f87171; }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="logo">🏥</div>
         <h1>ATLAS Offline</h1>
-        <p>You're currently offline and this page hasn't been cached yet.</p>
+        <p>You're offline and this page hasn't been cached yet.</p>
         <div class="url">${url.pathname}${url.search}</div>
-        <p><strong>Available offline pages:</strong></p>
+        <p><strong>Try these cached pages:</strong></p>
         <div style="margin-top: 1.5rem;">
           <a href="/" class="btn">🏠 Home</a>
           <a href="/dashboard" class="btn">📊 Dashboard</a>
           <a href="/patients" class="btn">👥 Patients</a>
         </div>
-        <button onclick="location.reload()" class="btn" style="margin-top: 1rem; border: 2px solid white;">
+        <button onclick="location.reload()" class="btn" style="margin-top: 1rem;">
           🔄 Retry
         </button>
-        <div class="status">
-          <div id="status">Checking connection...</div>
-        </div>
       </div>
       <script>
-        function updateStatus() {
-          const status = document.getElementById('status');
-          if (navigator.onLine) {
-            status.innerHTML = '<span class="online">🟢 Back online! Click Retry or wait...</span>';
-            setTimeout(() => location.reload(), 2000);
-          } else {
-            status.innerHTML = '<span class="offline">🔴 Still offline</span>';
-          }
-        }
-        
-        updateStatus();
-        window.addEventListener('online', updateStatus);
-        window.addEventListener('offline', updateStatus);
-        
-        // Auto-check every 3 seconds
-        setInterval(() => {
-          if (navigator.onLine) {
-            updateStatus();
-          }
-        }, 3000);
+        window.addEventListener('online', () => {
+          setTimeout(() => location.reload(), 1000);
+        });
       </script>
     </body>
     </html>
@@ -389,10 +356,6 @@ function generateOfflinePage(url) {
 
 	return new Response(html, {
 		status: 200,
-		statusText: 'OK',
-		headers: {
-			'Content-Type': 'text/html; charset=utf-8',
-			'Cache-Control': 'no-cache'
-		},
+		headers: { 'Content-Type': 'text/html; charset=utf-8' },
 	});
 }

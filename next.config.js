@@ -1,18 +1,27 @@
-// next.config.js - Simplified PWA config
+// next.config.js - FIXED VERSION
 const withPWA = require('next-pwa')({
 	dest: 'public',
 	register: true,
 	skipWaiting: true,
 	disable: process.env.NODE_ENV === 'development',
 
-	// Use our custom service worker
+	// Use custom service worker
 	sw: 'sw.js',
 
-	// Disable workbox's default runtime caching (we handle it in sw.js)
+	// CRITICAL: Disable automatic precaching (it's causing 404 errors)
 	runtimeCaching: [],
 
-	// Build service worker for production
-	buildExcludes: [/middleware-manifest\.json$/],
+	// Don't include these in precache manifest
+	buildExcludes: [
+		/middleware-manifest\.json$/,
+		/app-build-manifest\.json$/,
+		/_buildManifest\.js$/,
+		/_ssgManifest\.js$/,
+	],
+
+	// Reduce logging
+	cacheOnFrontEndNav: true,
+	reloadOnOnline: false,
 });
 
 /** @type {import('next').NextConfig} */
@@ -66,21 +75,24 @@ const nextConfig = {
 					},
 					{
 						key: 'Cache-Control',
-						value: 'public, max-age=86400, must-revalidate',
+						value: 'public, max-age=3600',
 					},
 				],
 			},
-			// Ensure service worker is served with correct headers
 			{
 				source: '/sw.js',
 				headers: [
 					{
 						key: 'Content-Type',
-						value: 'application/javascript',
+						value: 'application/javascript; charset=utf-8',
 					},
 					{
 						key: 'Cache-Control',
 						value: 'no-cache, no-store, must-revalidate',
+					},
+					{
+						key: 'Service-Worker-Allowed',
+						value: '/',
 					},
 				],
 			},
