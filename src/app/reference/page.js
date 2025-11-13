@@ -23,6 +23,7 @@ export default function ReferencePage() {
 		async function loadGuidelines() {
 			try {
 				const allGuidelines = await medicalDb.searchGuidelines('');
+				console.log('🔍 Reference page loaded guidelines:', allGuidelines.length);
 				setGuidelines(allGuidelines);
 
 				const uniqueCategories = [...new Set(allGuidelines.map(guide => guide.category))];
@@ -40,8 +41,14 @@ export default function ReferencePage() {
 
 	const filteredGuidelines = guidelines.filter(guide => {
 		const matchesCategory = selectedCategory === 'all' || guide.category === selectedCategory;
+
+		// FIXED: Handle both object and string content for searching
+		const contentStr = typeof guide.content === 'object'
+			? JSON.stringify(guide.content).toLowerCase()
+			: guide.content.toLowerCase();
+
 		const matchesSearch = guide.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			guide.content.toLowerCase().includes(searchQuery.toLowerCase());
+			contentStr.includes(searchQuery.toLowerCase());
 
 		return matchesCategory && matchesSearch;
 	});
@@ -50,9 +57,21 @@ export default function ReferencePage() {
 		setSelectedGuideline(guide);
 	};
 
-	const parseGuidelineContent = (contentJson) => {
+	// FIXED: Handle both object and JSON string content
+	const parseGuidelineContent = (contentInput) => {
 		try {
-			return JSON.parse(contentJson);
+			// If it's already an object, return it directly
+			if (typeof contentInput === 'object' && contentInput !== null) {
+				return contentInput;
+			}
+
+			// If it's a string, try to parse it as JSON
+			if (typeof contentInput === 'string') {
+				return JSON.parse(contentInput);
+			}
+
+			// Fallback
+			return { error: 'Invalid content format' };
 		} catch (error) {
 			console.error('Error parsing guideline content:', error);
 			return { error: 'Unable to parse guideline content' };
@@ -68,14 +87,30 @@ export default function ReferencePage() {
 
 		return (
 			<div className="space-y-6">
+				{/* Overview Section */}
 				{content.overview && (
 					<div>
-						<h4 className="text-lg font-semibold text-gray-800 mb-2">Overview</h4>
+						<h4 className="text-lg font-semibold text-blue-800 mb-2">Overview</h4>
 						<p className="text-gray-700">{content.overview}</p>
 					</div>
 				)}
 
-				{content.assessment && (
+				{/* Danger Signs */}
+				{content.dangerSigns && Array.isArray(content.dangerSigns) && (
+					<div>
+						<h4 className="text-lg font-semibold text-red-700 mb-2">⚠️ Danger Signs</h4>
+						<div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+							<ul className="list-disc pl-5 space-y-1">
+								{content.dangerSigns.map((sign, index) => (
+									<li key={index} className="text-red-800">{sign}</li>
+								))}
+							</ul>
+						</div>
+					</div>
+				)}
+
+				{/* Assessment */}
+				{content.assessment && Array.isArray(content.assessment) && (
 					<div>
 						<h4 className="text-lg font-semibold text-gray-800 mb-2">Assessment</h4>
 						<ul className="list-disc pl-5 space-y-1">
@@ -86,44 +121,136 @@ export default function ReferencePage() {
 					</div>
 				)}
 
+				{/* Management */}
 				{content.management && (
 					<div>
-						<h4 className="text-lg font-semibold text-gray-800 mb-2">Management</h4>
-						<ul className="list-disc pl-5 space-y-1">
-							{content.management.map((item, index) => (
-								<li key={index} className="text-gray-700">{item}</li>
-							))}
-						</ul>
+						<h4 className="text-lg font-semibold text-green-700 mb-2">💊 Management</h4>
+						{Array.isArray(content.management) ? (
+							<div className="bg-green-50 p-4 rounded-lg">
+								<ul className="list-disc pl-5 space-y-1">
+									{content.management.map((item, index) => (
+										<li key={index} className="text-green-800">{item}</li>
+									))}
+								</ul>
+							</div>
+						) : typeof content.management === 'object' ? (
+							<div className="space-y-4">
+								{Object.entries(content.management).map(([key, value]) => (
+									<div key={key} className="bg-green-50 p-4 rounded-lg">
+										<h5 className="font-medium text-green-800 capitalize mb-2">
+											{key.replace(/([A-Z])/g, ' $1').trim()}
+										</h5>
+										{Array.isArray(value) ? (
+											<ul className="list-disc pl-5 space-y-1">
+												{value.map((item, index) => (
+													<li key={index} className="text-green-700">{item}</li>
+												))}
+											</ul>
+										) : (
+											<p className="text-green-700">{value}</p>
+										)}
+									</div>
+								))}
+							</div>
+						) : (
+							<p className="text-gray-700 bg-green-50 p-4 rounded-lg">{content.management}</p>
+						)}
 					</div>
 				)}
 
+				{/* Medications */}
+				{content.medications && Array.isArray(content.medications) && (
+					<div>
+						<h4 className="text-lg font-semibold text-purple-700 mb-2">💉 Medications</h4>
+						<div className="space-y-3">
+							{content.medications.map((med, index) => (
+								<div key={index} className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+									<h5 className="font-medium text-purple-800">{med.name}</h5>
+									{med.dosage && (
+										<p className="text-purple-700"><strong>Dosage:</strong> {med.dosage}</p>
+									)}
+									{med.duration && (
+										<p className="text-purple-700"><strong>Duration:</strong> {med.duration}</p>
+									)}
+									{med.alternatives && Array.isArray(med.alternatives) && (
+										<div className="mt-2">
+											<strong className="text-purple-700">Alternatives:</strong>
+											<ul className="list-disc pl-5 mt-1">
+												{med.alternatives.map((alt, altIndex) => (
+													<li key={altIndex} className="text-purple-600">{alt}</li>
+												))}
+											</ul>
+										</div>
+									)}
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
+				{/* Treatment */}
+				{content.treatment && typeof content.treatment === 'object' && (
+					<div>
+						<h4 className="text-lg font-semibold text-green-700 mb-2">Treatment</h4>
+						<div className="space-y-4">
+							{Object.entries(content.treatment).map(([key, value]) => (
+								<div key={key} className="bg-green-50 p-4 rounded-lg">
+									<h5 className="font-medium text-green-800 capitalize mb-2">
+										{key.replace(/([A-Z])/g, ' $1').trim()}
+									</h5>
+									{Array.isArray(value) ? (
+										<ul className="list-disc pl-5 space-y-1">
+											{value.map((item, index) => (
+												<li key={index} className="text-green-700">{item}</li>
+											))}
+										</ul>
+									) : (
+										<p className="text-green-700">{value}</p>
+									)}
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
+				{/* Follow-up */}
 				{content.followUp && (
 					<div>
 						<h4 className="text-lg font-semibold text-gray-800 mb-2">Follow-up</h4>
-						<p className="text-gray-700">{content.followUp}</p>
+						<p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{content.followUp}</p>
 					</div>
 				)}
 
-				{content.redFlags && (
+				{/* Red Flags */}
+				{content.redFlags && Array.isArray(content.redFlags) && (
 					<div>
-						<h4 className="text-lg font-semibold text-gray-800 mb-2">Red Flags</h4>
-						<ul className="list-disc pl-5 space-y-1">
-							{content.redFlags.map((item, index) => (
-								<li key={index} className="text-red-700 font-medium">{item}</li>
-							))}
-						</ul>
+						<h4 className="text-lg font-semibold text-red-700 mb-2">🚩 Red Flags</h4>
+						<div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+							<ul className="list-disc pl-5 space-y-1">
+								{content.redFlags.map((flag, index) => (
+									<li key={index} className="text-red-800">{flag}</li>
+								))}
+							</ul>
+						</div>
 					</div>
 				)}
 
+				{/* Render any other sections */}
 				{Object.entries(content).map(([key, value]) => {
-					if (['overview', 'assessment', 'management', 'followUp', 'redFlags'].includes(key)) {
+					// Skip already rendered sections
+					const renderedSections = [
+						'overview', 'assessment', 'management', 'followUp', 'dangerSigns',
+						'medications', 'treatment', 'redFlags', 'error'
+					];
+
+					if (renderedSections.includes(key)) {
 						return null;
 					}
 
 					const sectionTitle = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
 
 					return (
-						<div key={key}>
+						<div key={key} className="mb-6">
 							<h4 className="text-lg font-semibold text-gray-800 mb-2">
 								{sectionTitle}
 							</h4>
@@ -134,27 +261,29 @@ export default function ReferencePage() {
 										<li key={index} className="text-gray-700">{item}</li>
 									))}
 								</ul>
-							) : typeof value === 'object' ? (
-								<div className="space-y-3">
+							) : typeof value === 'object' && value !== null ? (
+								<div className="bg-gray-50 p-4 rounded-lg">
 									{Object.entries(value).map(([subKey, subValue]) => (
-										<div key={subKey}>
-											<h5 className="font-medium text-gray-800 mb-1">{subKey}</h5>
+										<div key={subKey} className="mb-2">
+											<h5 className="font-medium text-gray-800 capitalize">
+												{subKey.replace(/([A-Z])/g, ' $1').trim()}:
+											</h5>
 											{typeof subValue === 'string' ? (
-												<p className="text-gray-700">{subValue}</p>
+												<p className="text-gray-700 ml-2">{subValue}</p>
 											) : Array.isArray(subValue) ? (
-												<ul className="list-disc pl-5 space-y-1">
+												<ul className="list-disc pl-7 space-y-1">
 													{subValue.map((item, index) => (
 														<li key={index} className="text-gray-700">{item}</li>
 													))}
 												</ul>
 											) : (
-												<p className="text-gray-700">{JSON.stringify(subValue)}</p>
+												<p className="text-gray-700 ml-2">{JSON.stringify(subValue)}</p>
 											)}
 										</div>
 									))}
 								</div>
 							) : (
-								<p className="text-gray-700">{value}</p>
+								<p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{value}</p>
 							)}
 						</div>
 					);
@@ -163,101 +292,93 @@ export default function ReferencePage() {
 		);
 	}
 
-	const BookIcon = () => (
-		<svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-		</svg>
-	);
-
-	const categoryOptions = [
-		{ value: 'all', label: 'All Categories' },
-		...categories.map(category => ({ value: category, label: category }))
-	];
-
 	if (loading) {
 		return (
-			<div className="max-w-7xl mx-auto p-6">
-				<div className="flex justify-center items-center min-h-64">
-					<LoadingSpinner size="lg" />
-					<span className="ml-3 text-gray-600">Loading clinical guidelines...</span>
+			<div className="max-w-7xl mx-auto px-4 py-8">
+				<div className="text-center">
+					<LoadingSpinner />
+					<p className="text-gray-500 mt-4">Loading clinical reference materials...</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className="max-w-7xl mx-auto p-6">
+		<div className="max-w-7xl mx-auto px-4 py-6">
 			<div className="mb-6">
-				<h1 className="text-2xl font-bold text-gray-900">Clinical Reference</h1>
-				<p className="mt-1 text-gray-600">Access clinical guidelines, protocols, and reference materials for evidence-based care.</p>
+				<h1 className="text-3xl font-bold text-gray-800 mb-2">Clinical Reference</h1>
+				<p className="text-gray-600">
+					Comprehensive clinical guidelines and reference materials
+				</p>
 			</div>
 
+			{/* Search and Filter */}
+			<div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
+				<div className="flex flex-col md:flex-row gap-4">
+					<div className="flex-1">
+						<Input
+							placeholder="Search guidelines, conditions, treatments..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
+					</div>
+					<div className="w-full md:w-64">
+						<Select
+							value={selectedCategory}
+							onValueChange={setSelectedCategory}
+						>
+							<option value="all">All Categories ({guidelines.length})</option>
+							{categories.map(category => (
+								<option key={category} value={category}>
+									{category} ({guidelines.filter(g => g.category === category).length})
+								</option>
+							))}
+						</Select>
+					</div>
+				</div>
+				<div className="mt-2 text-sm text-gray-500">
+					{filteredGuidelines.length} guidelines available
+				</div>
+			</div>
+
+			{/* Main Content */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 				{/* Guidelines List */}
 				<div className="lg:col-span-1">
-					<Card>
-						<CardHeader>
-							<h2 className="text-lg font-semibold text-gray-900">Clinical Guidelines</h2>
-							<div className="flex items-center justify-between mt-2">
-								<Badge variant="secondary">
-									{filteredGuidelines.length} guidelines
-								</Badge>
-								{selectedCategory !== 'all' && (
-									<Badge variant="primary">{selectedCategory}</Badge>
-								)}
-							</div>
+					<Card className="max-h-[600px] overflow-hidden">
+						<CardHeader className="bg-blue-50">
+							<h3 className="font-semibold text-gray-800">Available Guidelines</h3>
+							<p className="text-sm text-gray-500">Click to view details</p>
 						</CardHeader>
-
-						<CardContent>
-							<div className="space-y-4">
-								<Select
-									label="Category"
-									value={selectedCategory}
-									onChange={(e) => setSelectedCategory(e.target.value)}
-									options={categoryOptions}
-								/>
-
-								<Input
-									label="Search Guidelines"
-									type="text"
-									placeholder="Search by keyword..."
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
-							</div>
-						</CardContent>
-
-						<CardContent padding={false}>
+						<CardContent className="p-0">
 							{filteredGuidelines.length === 0 ? (
-								<div className="p-6">
-									<EmptyState
-										icon={BookIcon}
-										title="No guidelines found"
-										description={searchQuery ? `No guidelines found matching "${searchQuery}"` : "No guidelines available for the selected category."}
-										action={searchQuery && (
-											<Button onClick={() => setSearchQuery('')} variant="secondary">
-												Clear Search
-											</Button>
-										)}
-									/>
-								</div>
+								<EmptyState
+									message="No guidelines found"
+									description="Try adjusting your search or filter criteria"
+								/>
 							) : (
-								<div className="max-h-96 overflow-y-auto">
-									{filteredGuidelines.map(guide => {
+								<div className="overflow-y-auto max-h-[500px]">
+									{filteredGuidelines.map((guide) => {
 										const isActive = selectedGuideline?.id === guide.id;
 										return (
 											<div
 												key={guide.id}
-												className={`p-4 cursor-pointer border-b border-gray-200 hover:bg-gray-50 transition-colors ${isActive ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
+												className={`p-4 cursor-pointer border-b border-gray-200 hover:bg-blue-50 transition-colors ${isActive ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+													}`}
 												onClick={() => handleSelectGuideline(guide)}
 											>
-												<h4 className="font-medium text-gray-900">{guide.title}</h4>
-												<div className="flex items-center justify-between mt-2">
-													<Badge variant="secondary" className="text-xs">{guide.category}</Badge>
-													<p className="text-xs text-gray-400">
-														Updated: {new Date(guide.lastUpdated).toLocaleDateString()}
-													</p>
+												<h4 className="font-medium text-gray-900 mb-1">{guide.title}</h4>
+												<div className="flex items-center justify-between mb-1">
+													<Badge variant="secondary">{guide.category}</Badge>
+													{guide.subcategory && (
+														<span className="text-xs text-gray-500">{guide.subcategory}</span>
+													)}
 												</div>
+												{guide.resourceLevel && (
+													<div className="text-xs text-gray-400 capitalize">
+														{guide.resourceLevel} level
+													</div>
+												)}
 											</div>
 										);
 									})}
@@ -267,38 +388,47 @@ export default function ReferencePage() {
 					</Card>
 				</div>
 
-				{/* Guideline Content */}
+				{/* Guideline Details */}
 				<div className="lg:col-span-2">
-					<Card>
-						{selectedGuideline ? (
-							<>
-								<CardHeader>
-									<h2 className="text-xl font-semibold text-gray-900">{selectedGuideline.title}</h2>
-									<div className="flex flex-wrap gap-2 mt-3">
-										<Badge variant="primary">{selectedGuideline.category}</Badge>
-										<Badge variant="secondary">
-											Last updated: {new Date(selectedGuideline.lastUpdated).toLocaleDateString()}
+					{selectedGuideline ? (
+						<Card>
+							<CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+								<h3 className="text-xl font-semibold mb-2">{selectedGuideline.title}</h3>
+								<div className="flex flex-wrap gap-2">
+									<Badge className="bg-blue-400 text-blue-100">{selectedGuideline.category}</Badge>
+									{selectedGuideline.subcategory && (
+										<Badge className="bg-blue-400 text-blue-100">{selectedGuideline.subcategory}</Badge>
+									)}
+									{selectedGuideline.resourceLevel && (
+										<Badge className="bg-green-400 text-green-100 capitalize">
+											{selectedGuideline.resourceLevel} level
 										</Badge>
-									</div>
-								</CardHeader>
-
-								<CardContent>
-									<div className="prose max-w-none">
-										{renderGuidelineContent(parseGuidelineContent(selectedGuideline.content))}
-									</div>
-								</CardContent>
-							</>
-						) : (
-							<CardContent>
-								<EmptyState
-									icon={BookIcon}
-									title="No guideline selected"
-									description="Select a guideline from the list to view its details and clinical recommendations."
-									className="py-16"
-								/>
+									)}
+								</div>
+							</CardHeader>
+							<CardContent className="max-h-[600px] overflow-y-auto">
+								{renderGuidelineContent(parseGuidelineContent(selectedGuideline.content))}
 							</CardContent>
-						)}
-					</Card>
+						</Card>
+					) : (
+						<Card className="text-center">
+							<CardContent className="py-16">
+								<div className="text-gray-400 mb-4">
+									<svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+									</svg>
+								</div>
+								<h3 className="text-lg font-medium text-gray-900 mb-2">Select a Clinical Guideline</h3>
+								<p className="text-gray-500 mb-4">
+									Choose a guideline from the list to view comprehensive clinical protocols,
+									management strategies, and medication information.
+								</p>
+								<div className="text-sm text-gray-400">
+									💡 Use the search box to find specific conditions or treatments
+								</div>
+							</CardContent>
+						</Card>
+					)}
 				</div>
 			</div>
 		</div>
