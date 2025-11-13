@@ -1,5 +1,5 @@
-// public/sw.js - SIMPLIFIED WITHOUT PRECACHING
-const CACHE_VERSION = 'v2'; // Increment to force update
+// public/sw.js - FIXED VERSION WITH WORKING CACHE
+const CACHE_VERSION = 'v2';
 const CACHE_NAMES = {
 	pages: `atlas-pages-${CACHE_VERSION}`,
 	api: `atlas-api-${CACHE_VERSION}`,
@@ -7,18 +7,15 @@ const CACHE_NAMES = {
 	assets: `atlas-assets-${CACHE_VERSION}`,
 };
 
-// List of all current caches
 const ALL_CACHES = Object.values(CACHE_NAMES);
 
-console.log('🔧 [SW] Loading service worker...');
+console.log('🔧 [SW] Service Worker loading...');
 
 // ============================================================================
-// Install - Skip Waiting Immediately
+// Install
 // ============================================================================
 self.addEventListener('install', (event) => {
 	console.log('🔧 [SW] Installing...');
-
-	// CRITICAL: Skip waiting to activate immediately
 	self.skipWaiting();
 
 	event.waitUntil(
@@ -29,14 +26,14 @@ self.addEventListener('install', (event) => {
 });
 
 // ============================================================================
-// Activate - Take Control Immediately
+// Activate
 // ============================================================================
 self.addEventListener('activate', (event) => {
 	console.log('✅ [SW] Activating...');
 
 	event.waitUntil(
 		(async () => {
-			// Clean up old caches
+			// Clean old caches
 			const cacheNames = await caches.keys();
 			await Promise.all(
 				cacheNames
@@ -47,11 +44,11 @@ self.addEventListener('activate', (event) => {
 					})
 			);
 
-			// CRITICAL: Take control of all pages immediately
+			// Take control immediately
 			await self.clients.claim();
 			console.log('✅ [SW] Now controlling all pages');
 
-			// Notify all clients
+			// Notify clients
 			const clients = await self.clients.matchAll({ type: 'window' });
 			clients.forEach(client => {
 				client.postMessage({
@@ -64,23 +61,93 @@ self.addEventListener('activate', (event) => {
 });
 
 // ============================================================================
-// Fetch - Handle All Requests
+// Message Handler - FIXED
+// ============================================================================
+self.addEventListener('message', (event) => {
+	console.log('📨 [SW] Received message:', event.data?.type);
+
+	if (event.data && event.data.type === 'CACHE_URLS') {
+		console.log('📥 [SW] Cache request for', event.data.urls?.length, 'URLs');
+		event.waitUntil(
+			cacheUrlsFixed(event.data.urls).then(results => {
+				console.log('✅ [SW] Cache operation complete:', results);
+
+				// Send response back to client
+				event.source?.postMessage({
+					type: 'CACHE_COMPLETE',
+					results: results,
+				});
+			})
+		);
+	}
+
+	if (event.data && event.data.type === 'SKIP_WAITING') {
+		self.skipWaiting();
+	}
+});
+
+// ============================================================================
+// FIXED Cache Function
+// ============================================================================
+async function cacheUrlsFixed(urls) {
+	if (!urls || urls.length === 0) {
+		console.warn('⚠️ [SW] No URLs provided to cache');
+		return [];
+	}
+
+	console.log('🔄 [SW] Starting to cache', urls.length, 'URLs...');
+	const cache = await caches.open(CACHE_NAMES.pages);
+	const results = [];
+
+	for (const url of urls) {
+		try {
+			console.log('📍 [SW] Fetching:', url);
+
+			// Fetch with proper options
+			const response = await fetch(url, {
+				method: 'GET',
+				credentials: 'same-origin',
+				cache: 'no-cache',
+			});
+
+			if (response.ok && response.status === 200) {
+				// Clone before caching
+				const responseToCache = response.clone();
+				await cache.put(url, responseToCache);
+
+				console.log('✅ [SW] Cached:', url);
+				results.push({ url, success: true, status: response.status });
+			} else {
+				console.warn('⚠️ [SW] Bad response:', url, response.status);
+				results.push({ url, success: false, status: response.status });
+			}
+		} catch (error) {
+			console.error('❌ [SW] Error caching:', url, error.message);
+			results.push({ url, success: false, error: error.message });
+		}
+	}
+
+	// Log summary
+	const successful = results.filter(r => r.success).length;
+	console.log(`✅ [SW] Cache summary: ${successful}/${urls.length} URLs cached successfully`);
+
+	return results;
+}
+
+// ============================================================================
+// Fetch Handler
 // ============================================================================
 self.addEventListener('fetch', (event) => {
 	const { request } = event;
 	const url = new URL(request.url);
 
-	// Skip non-GET requests
-	if (request.method !== 'GET') {
-		return;
-	}
+	// Skip non-GET
+	if (request.method !== 'GET') return;
 
-	// Skip chrome-extension and other non-http requests
-	if (!url.protocol.startsWith('http')) {
-		return;
-	}
+	// Skip non-http
+	if (!url.protocol.startsWith('http')) return;
 
-	// Route to appropriate handler
+	// Route requests
 	if (request.mode === 'navigate') {
 		event.respondWith(handleNavigationRequest(request));
 	} else if (url.pathname.startsWith('/api/')) {
@@ -93,50 +160,52 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ============================================================================
-// Handler: Navigation Requests (HTML pages)
+// Navigation Handler
 // ============================================================================
 async function handleNavigationRequest(request) {
 	const cache = await caches.open(CACHE_NAMES.pages);
+	const url = new URL(request.url);
+
+	console.log('🧭 [SW] Navigation:', url.pathname + url.search);
 
 	try {
-		// Try network first (with timeout)
-		const networkPromise = fetch(request);
-		const timeoutPromise = new Promise((_, reject) =>
-			setTimeout(() => reject(new Error('timeout')), 3000)
-		);
+		// Network first with timeout
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-		const response = await Promise.race([networkPromise, timeoutPromise]);
+		const response = await fetch(request, { signal: controller.signal });
+		clearTimeout(timeoutId);
 
 		if (response.ok) {
-			// Cache successful response
+			console.log('✅ [SW] Network success:', request.url);
 			cache.put(request.url, response.clone());
 			return response;
 		}
 	} catch (error) {
-		console.log('📱 [SW] Network failed, trying cache:', request.url);
+		console.log('📱 [SW] Network failed, trying cache');
 	}
 
-	// Try cache (exact match including query params)
+	// Try exact cache match (with query params)
 	let cachedResponse = await cache.match(request.url, { ignoreSearch: false });
 
 	if (cachedResponse) {
-		console.log('✅ [SW] Serving from cache:', request.url);
+		console.log('✅ [SW] Cache hit (exact):', request.url);
 		return cachedResponse;
 	}
 
 	// Try without query params
-	const urlWithoutQuery = request.url.split('?')[0];
-	cachedResponse = await cache.match(urlWithoutQuery);
+	const baseUrl = url.origin + url.pathname;
+	cachedResponse = await cache.match(baseUrl);
 
 	if (cachedResponse) {
-		console.log('✅ [SW] Serving base page from cache:', urlWithoutQuery);
+		console.log('✅ [SW] Cache hit (base):', baseUrl);
 		return cachedResponse;
 	}
 
 	// Fallback chain
 	const fallbacks = ['/dashboard', '/'];
 	for (const fallback of fallbacks) {
-		const fallbackUrl = new URL(fallback, self.location.origin).href;
+		const fallbackUrl = new URL(fallback, url.origin).href;
 		const fallbackResponse = await cache.match(fallbackUrl);
 
 		if (fallbackResponse) {
@@ -145,65 +214,48 @@ async function handleNavigationRequest(request) {
 		}
 	}
 
-	// Last resort: offline page
-	console.log('📵 [SW] No cache available - generating offline page');
-	return generateOfflinePage(new URL(request.url));
+	// Offline page
+	console.log('📵 [SW] No cache - showing offline page');
+	return generateOfflinePage(url);
 }
 
 // ============================================================================
-// Handler: API Requests
+// API Handler
 // ============================================================================
 async function handleApiRequest(request) {
 	const cache = await caches.open(CACHE_NAMES.api);
 
 	try {
 		const response = await fetch(request);
-
 		if (response.ok) {
 			cache.put(request.url, response.clone());
 		}
-
 		return response;
 	} catch (error) {
 		const cachedResponse = await cache.match(request.url);
-
-		if (cachedResponse) {
-			return cachedResponse;
-		}
+		if (cachedResponse) return cachedResponse;
 
 		return new Response(
-			JSON.stringify({
-				error: 'offline',
-				message: 'API not available offline',
-			}),
-			{
-				status: 503,
-				headers: { 'Content-Type': 'application/json' },
-			}
+			JSON.stringify({ error: 'offline', message: 'API unavailable' }),
+			{ status: 503, headers: { 'Content-Type': 'application/json' } }
 		);
 	}
 }
 
 // ============================================================================
-// Handler: Static Files
+// Static Handler
 // ============================================================================
 async function handleStaticRequest(request) {
 	const cache = await caches.open(CACHE_NAMES.static);
 
-	// Cache first for static files
 	const cachedResponse = await cache.match(request.url);
-
-	if (cachedResponse) {
-		return cachedResponse;
-	}
+	if (cachedResponse) return cachedResponse;
 
 	try {
 		const response = await fetch(request);
-
 		if (response.ok) {
 			cache.put(request.url, response.clone());
 		}
-
 		return response;
 	} catch (error) {
 		return new Response('Not found', { status: 404 });
@@ -211,24 +263,19 @@ async function handleStaticRequest(request) {
 }
 
 // ============================================================================
-// Handler: Assets (images, fonts)
+// Asset Handler
 // ============================================================================
 async function handleAssetRequest(request) {
 	const cache = await caches.open(CACHE_NAMES.assets);
 
 	const cachedResponse = await cache.match(request.url);
-
-	if (cachedResponse) {
-		return cachedResponse;
-	}
+	if (cachedResponse) return cachedResponse;
 
 	try {
 		const response = await fetch(request);
-
 		if (response.ok) {
 			cache.put(request.url, response.clone());
 		}
-
 		return response;
 	} catch (error) {
 		return new Response('Not found', { status: 404 });
@@ -236,7 +283,7 @@ async function handleAssetRequest(request) {
 }
 
 // ============================================================================
-// Helper: Check if Asset Request
+// Helper: Check Asset Request
 // ============================================================================
 function isAssetRequest(request) {
 	const url = new URL(request.url);
@@ -245,45 +292,6 @@ function isAssetRequest(request) {
 		request.destination === 'font' ||
 		/\.(png|jpg|jpeg|svg|gif|webp|ico|woff|woff2|ttf|otf)$/i.test(url.pathname)
 	);
-}
-
-// ============================================================================
-// Message Handler - Cache URLs from Client
-// ============================================================================
-self.addEventListener('message', (event) => {
-	if (event.data && event.data.type === 'CACHE_URLS') {
-		event.waitUntil(cacheUrls(event.data.urls));
-	}
-
-	if (event.data && event.data.type === 'SKIP_WAITING') {
-		self.skipWaiting();
-	}
-});
-
-async function cacheUrls(urls) {
-	const cache = await caches.open(CACHE_NAMES.pages);
-	const results = [];
-
-	for (const url of urls) {
-		try {
-			const response = await fetch(url, {
-				cache: 'no-cache',
-				credentials: 'same-origin'
-			});
-
-			if (response.ok) {
-				await cache.put(url, response.clone());
-				results.push({ url, success: true });
-				console.log('✅ [SW] Cached:', url);
-			} else {
-				results.push({ url, success: false, status: response.status });
-			}
-		} catch (error) {
-			results.push({ url, success: false, error: error.message });
-		}
-	}
-
-	return results;
 }
 
 // ============================================================================

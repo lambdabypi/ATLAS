@@ -194,6 +194,8 @@ async function waitForServiceWorkerControl() {
 // ============================================================================
 // Pre-cache Critical Pages via Service Worker
 // ============================================================================
+// src/app/layout.js - FIXED PRE-CACHE FUNCTION
+
 async function preCacheCriticalPages() {
 	if (!navigator.onLine) {
 		console.log('📱 Offline - skipping pre-cache');
@@ -211,43 +213,29 @@ async function preCacheCriticalPages() {
 		// Get all URLs that need to be cached
 		const urlsToCache = getCriticalUrls();
 
-		// Send cache request to service worker
-		const messageChannel = new MessageChannel();
-
-		const cachePromise = new Promise((resolve) => {
-			messageChannel.port1.onmessage = (event) => {
-				resolve(event.data);
-			};
+		// Send cache request to service worker (it will handle the fetching)
+		navigator.serviceWorker.controller.postMessage({
+			type: 'CACHE_URLS',
+			urls: urlsToCache,
 		});
 
-		navigator.serviceWorker.controller.postMessage(
-			{
-				type: 'CACHE_URLS',
-				urls: urlsToCache,
-			},
-			[messageChannel.port2]
-		);
+		console.log(`📤 Sent ${urlsToCache.length} URLs to Service Worker for caching`);
 
-		// Wait for confirmation (with timeout)
-		const timeoutPromise = new Promise((resolve) =>
-			setTimeout(() => resolve({ timeout: true }), 30000)
-		);
-
-		await Promise.race([cachePromise, timeoutPromise]);
-
-		// Verify cached URLs
-		await verifyCachedUrls();
-
-		console.log('✅ Pre-cache complete');
+		// Wait a bit for caching to complete, then verify
+		setTimeout(async () => {
+			await verifyCachedUrls();
+		}, 5000);
 
 	} catch (error) {
 		console.error('❌ Pre-cache error:', error);
 	}
 }
 
+
 // ============================================================================
 // Get Critical URLs to Cache
 // ============================================================================
+
 function getCriticalUrls() {
 	const baseUrls = [
 		'/',
@@ -275,26 +263,24 @@ function getCriticalUrls() {
 	// Add enhanced mode
 	const enhancedUrls = [
 		'/consultation/new?mode=enhanced',
-		'/consultation/new?mode=enhanced&patientId=1',
 	];
 
+	// Convert to absolute URLs
 	return [
 		...baseUrls,
 		...patientUrls,
 		...consultationUrls,
 		...enhancedUrls,
-	].map(url => {
-		// Convert relative URLs to absolute
-		return new URL(url, window.location.origin).href;
-	});
+	].map(url => new URL(url, window.location.origin).href);
 }
 
 // ============================================================================
 // Verify Cached URLs
 // ============================================================================
+
 async function verifyCachedUrls() {
 	try {
-		const cache = await caches.open('atlas-pages-v1');
+		const cache = await caches.open('atlas-pages-v2');
 		const cachedRequests = await cache.keys();
 		const cachedUrls = cachedRequests.map(req => req.url);
 
@@ -317,7 +303,7 @@ async function verifyCachedUrls() {
 			if (response) {
 				console.log('✅ VERIFIED:', testUrl);
 			} else {
-				console.error('❌ NOT CACHED:', testUrl);
+				console.warn('⚠️ NOT CACHED:', testUrl);
 			}
 		}
 	} catch (error) {

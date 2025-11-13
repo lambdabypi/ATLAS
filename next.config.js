@@ -1,29 +1,4 @@
-// next.config.js - FIXED VERSION
-const withPWA = require('next-pwa')({
-	dest: 'public',
-	register: true,
-	skipWaiting: true,
-	disable: process.env.NODE_ENV === 'development',
-
-	// Use custom service worker
-	sw: 'sw.js',
-
-	// CRITICAL: Disable automatic precaching (it's causing 404 errors)
-	runtimeCaching: [],
-
-	// Don't include these in precache manifest
-	buildExcludes: [
-		/middleware-manifest\.json$/,
-		/app-build-manifest\.json$/,
-		/_buildManifest\.js$/,
-		/_ssgManifest\.js$/,
-	],
-
-	// Reduce logging
-	cacheOnFrontEndNav: true,
-	reloadOnOnline: false,
-});
-
+// next.config.js - WITHOUT next-pwa
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 	reactStrictMode: true,
@@ -104,4 +79,4 @@ const nextConfig = {
 	},
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = nextConfig;
