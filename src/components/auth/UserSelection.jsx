@@ -5,11 +5,34 @@ import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 
 export const UserSelection = ({ onUserSelected }) => {
-	const { users, selectUser, currentUser } = useUserSystem();
+	// Add error handling for useUserSystem hook
+	const userSystem = useUserSystem();
 	const [selectedUserId, setSelectedUserId] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 
+	// Handle case where useUserSystem returns undefined or incomplete data
+	if (!userSystem) {
+		return (
+			<div className="atlas-backdrop">
+				<div className="min-h-screen flex flex-col items-center justify-center p-4">
+					<div className="text-center">
+						<div className="atlas-spinner mb-4"></div>
+						<span className="text-gray-600">Loading user system...</span>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	const { users = [], selectUser, currentUser } = userSystem;
+
 	const handleUserSelect = async (userId) => {
+		if (!selectUser) {
+			console.error('selectUser function not available');
+			alert('User system not ready. Please refresh the page.');
+			return;
+		}
+
 		try {
 			setIsLoading(true);
 			console.log('Selecting user:', userId);
