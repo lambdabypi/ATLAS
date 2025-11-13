@@ -1,4 +1,4 @@
-// src/app/reference/page.js - CLEAN AND SIMPLE VERSION
+// src/app/reference/page.js - COMPLETE CLEAN VERSION WITH FIXES
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -78,6 +78,22 @@ export default function ReferencePage() {
 	const renderSection = (title, content, type = 'list') => {
 		if (!content) return null;
 
+		// Helper function to safely render any value
+		const renderValue = (value) => {
+			if (typeof value === 'object' && value !== null) {
+				if (Array.isArray(value)) {
+					return value.map((item, index) => (
+						<span key={index}>
+							{typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}
+							{index < value.length - 1 ? ', ' : ''}
+						</span>
+					));
+				}
+				return JSON.stringify(value);
+			}
+			return String(value);
+		};
+
 		return (
 			<div className="mb-6">
 				<h4 className="text-lg font-semibold text-gray-900 mb-3">{title}</h4>
@@ -87,12 +103,12 @@ export default function ReferencePage() {
 							{content.map((item, index) => (
 								<li key={index} className="text-gray-700 flex items-start">
 									<span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-									{item}
+									<span>{renderValue(item)}</span>
 								</li>
 							))}
 						</ul>
 					) : type === 'text' ? (
-						<p className="text-gray-700 leading-relaxed">{content}</p>
+						<p className="text-gray-700 leading-relaxed">{renderValue(content)}</p>
 					) : type === 'object' && typeof content === 'object' ? (
 						<div className="space-y-3">
 							{Object.entries(content).map(([key, value]) => (
@@ -103,17 +119,17 @@ export default function ReferencePage() {
 									{Array.isArray(value) ? (
 										<ul className="ml-4 space-y-1">
 											{value.map((item, index) => (
-												<li key={index} className="text-gray-600">• {item}</li>
+												<li key={index} className="text-gray-600">• {renderValue(item)}</li>
 											))}
 										</ul>
 									) : (
-										<p className="text-gray-600 ml-4">{value}</p>
+										<p className="text-gray-600 ml-4">{renderValue(value)}</p>
 									)}
 								</div>
 							))}
 						</div>
 					) : (
-						<p className="text-gray-700">{content}</p>
+						<p className="text-gray-700">{renderValue(content)}</p>
 					)}
 				</div>
 			</div>
