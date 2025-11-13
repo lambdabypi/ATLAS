@@ -167,7 +167,20 @@ export default function ReferencePage() {
 								<div key={index} className="bg-purple-50 p-4 rounded-lg border border-purple-200">
 									<h5 className="font-medium text-purple-800">{med.name}</h5>
 									{med.dosage && (
-										<p className="text-purple-700"><strong>Dosage:</strong> {med.dosage}</p>
+										<div className="text-purple-700">
+											<strong>Dosage:</strong>{' '}
+											{typeof med.dosage === 'object' ? (
+												<div className="mt-1">
+													{Object.entries(med.dosage).map(([key, value]) => (
+														<div key={key} className="ml-2">
+															<span className="font-medium capitalize">{key}:</span> {value}
+														</div>
+													))}
+												</div>
+											) : (
+												med.dosage
+											)}
+										</div>
 									)}
 									{med.duration && (
 										<p className="text-purple-700"><strong>Duration:</strong> {med.duration}</p>
@@ -204,6 +217,15 @@ export default function ReferencePage() {
 												<li key={index} className="text-green-700">{item}</li>
 											))}
 										</ul>
+									) : typeof value === 'object' && value !== null ? (
+										<div className="ml-2">
+											{Object.entries(value).map(([subKey, subValue]) => (
+												<div key={subKey} className="mb-1">
+													<span className="font-medium text-green-800 capitalize">{subKey}:</span>
+													<span className="text-green-700 ml-1">{subValue}</span>
+												</div>
+											))}
+										</div>
 									) : (
 										<p className="text-green-700">{value}</p>
 									)}
