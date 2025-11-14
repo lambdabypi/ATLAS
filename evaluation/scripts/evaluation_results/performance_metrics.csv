@@ -1,0 +1,6 @@
+,actual,target,meets_target,variance_percent
+pwa_score,85.0,90.0,False,-5.555555555555555
+performance_score,78.0,80.0,False,-2.5
+first_contentful_paint,1.8,2.0,True,-9.999999999999998
+time_to_interactive,2.4,3.0,True,-20.000000000000004
+offline_success_rate,92.0,95.0,False,-3.1578947368421053

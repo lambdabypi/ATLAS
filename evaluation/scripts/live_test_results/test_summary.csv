@@ -1,0 +1,8 @@
+test_name,timestamp,success,error
+accessibility,2025-11-14T02:58:16.761822,True,
+pwa_functionality,2025-11-14T02:58:19.114251,True,
+ui_responsiveness,2025-11-14T02:58:20.793439,True,
+patient_workflow,2025-11-14T02:58:24.340312,True,
+consultation_workflow,2025-11-14T02:58:26.198134,True,
+offline_functionality,2025-11-14T02:58:27.275268,True,
+lighthouse_audit,2025-11-14T02:58:28.418046,False,Lighthouse CLI not found. Please install: npm install -g lighthouse

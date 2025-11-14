@@ -1,0 +1,147 @@
+{
+  "atlas_testing_report": {
+    "application_url": "https://atlas-clinical-git-main-lambdabypis-projects.vercel.app",
+    "test_timestamp": "2025-11-14T02:58:14.467036",
+    "tests_completed": [
+      "accessibility",
+      "pwa_functionality",
+      "ui_responsiveness",
+      "patient_workflow",
+      "consultation_workflow",
+      "offline_functionality",
+      "lighthouse_audit"
+    ],
+    "summary": {
+      "total_tests": 7,
+      "successful_tests": 6,
+      "failed_tests": 0,
+      "tests_with_errors": 1,
+      "overall_health_score": 33.33333333333333
+    }
+  },
+  "detailed_results": {
+    "accessibility": {
+      "test_name": "application_accessibility",
+      "timestamp": "2025-11-14T02:58:16.761822",
+      "results": {
+        "main_page_status": 401,
+        "main_page_load_time": 0.395976,
+        "main_page_accessible": false,
+        "page/dashboard_status": 401,
+        "page/dashboard_accessible": false,
+        "page/patients_status": 401,
+        "page/patients_accessible": false,
+        "page/consultation/new_status": 401,
+        "page/consultation/new_accessible": false,
+        "page/guidelines_status": 401,
+        "page/guidelines_accessible": false,
+        "page/reference_status": 401,
+        "page/reference_accessible": false
+      }
+    },
+    "pwa_functionality": {
+      "test_name": "pwa_functionality",
+      "timestamp": "2025-11-14T02:58:19.114251",
+      "results": {
+        "manifest_accessible": true,
+        "manifest_data": {
+          "name": "Vercel",
+          "short_name": "Vercel",
+          "start_url": "/",
+          "display": "standalone",
+          "theme_color": "#000000"
+        },
+        "service_worker_error": "Message: javascript error: Unexpected token '.'\nJavaScript stack:\nSyntaxError: Unexpected token '.'\n    at new Function (<anonymous>)\n    at <anonymous>:457:26\n    at new Promise (<anonymous>)\n    at executeAsyncScript (<anonymous>:451:17)\n    at <anonymous>:481:29\n    at callFunction (<anonymous>:386:22)\n    at <anonymous>:400:23\n    at <anonymous>:401:3\n  (Session info: chrome=142.0.7444.163)\nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t0x7ff7cc49a235\n\t0x7ff7cc1f2650\n\t0x7ff7cbf816dd\n\t0x7ff7cbf8cf58\n\t0x7ff7cc02d2ff\n\t0x7ff7cc002b0a\n\t0x7ff7cc02baba\n\t0x7ff7cbfcb0ed\n\t0x7ff7cbfcbf63\n\t0x7ff7cc4c5d60\n\t0x7ff7cc4bfe8a\n\t0x7ff7cc4e1005\n\t0x7ff7cc20d73e\n\t0x7ff7cc214e3f\n\t0x7ff7cc1fb7e4\n\t0x7ff7cc1fb99f\n\t0x7ff7cc1e1908\n\t0x7ff841bee8d7\n\t0x7ff843e6c53c\n",
+        "storage_capabilities": {
+          "indexedDB": true,
+          "localStorage": true,
+          "sessionStorage": true
+        }
+      }
+    },
+    "ui_responsiveness": {
+      "test_name": "ui_responsiveness",
+      "timestamp": "2025-11-14T02:58:20.793439",
+      "results": {
+        "mobile": {
+          "viewport_size": "375x667",
+          "page_loaded": true,
+          "navigation_visible": true,
+          "main_content_visible": true,
+          "performance": {
+            "domContentLoaded": 0.7000000029802322,
+            "loadComplete": 0.29999999701976776,
+            "memoryUsed": 25876311
+          }
+        },
+        "tablet": {
+          "viewport_size": "768x1024",
+          "page_loaded": true,
+          "navigation_visible": true,
+          "main_content_visible": true,
+          "performance": {
+            "domContentLoaded": 0.7000000029802322,
+            "loadComplete": 0.20000000298023224,
+            "memoryUsed": 24776841
+          }
+        },
+        "desktop": {
+          "viewport_size": "1920x1080",
+          "page_loaded": true,
+          "navigation_visible": true,
+          "main_content_visible": true,
+          "performance": {
+            "domContentLoaded": 0.6000000089406967,
+            "loadComplete": 0.29999999701976776,
+            "memoryUsed": 24837338
+          }
+        }
+      }
+    },
+    "patient_workflow": {
+      "test_name": "patient_management_workflow",
+      "timestamp": "2025-11-14T02:58:24.340312",
+      "results": {
+        "patients_page_loaded": true,
+        "new_patient_form_loaded": true,
+        "form_elements_count": 1
+      }
+    },
+    "consultation_workflow": {
+      "test_name": "consultation_workflow",
+      "timestamp": "2025-11-14T02:58:26.198134",
+      "results": {
+        "consultation_form_loaded": true,
+        "input_elements": 1,
+        "textarea_elements": 0,
+        "select_elements": 0,
+        "ai_features_present": true,
+        "enhanced_consultation_available": true
+      }
+    },
+    "offline_functionality": {
+      "test_name": "offline_functionality_simulation",
+      "timestamp": "2025-11-14T02:58:27.275268",
+      "results": {
+        "offline_page_/dashboard": {
+          "loaded": false,
+          "error": "Message: unknown error: net::ERR_INTERNET_DISCONNECTED\n  (Session info: chrome=142.0.7444.163)\nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t0x7ff7cc49a235\n\t0x7ff7cc1f2650\n\t0x7ff7cbf816dd\n\t0x7ff7cbf7e228\n\t0x7ff7cbf6eba9\n\t0x7ff7cbf709d7\n\t0x7ff7cbf6f160\n\t0x7ff7cbf6e917\n\t0x7ff7cbf6e5db\n\t0x7ff7cbf6c145\n\t0x7ff7cbf6c9dc\n\t0x7ff7cbf859ea\n\t0x7ff7cc02c8be\n\t0x7ff7cc002b0a\n\t0x7ff7cc02baba\n\t0x7ff7cbfcb0ed\n\t0x7ff7cbfcbf63\n\t0x7ff7cc4c5d60\n\t0x7ff7cc4bfe8a\n\t0x7ff7cc4e1005\n\t0x7ff7cc20d73e\n\t0x7ff7cc214e3f\n\t0x7ff7cc1fb7e4\n\t0x7ff7cc1fb99f\n\t0x7ff7cc1e1908\n\t0x7ff841bee8d7\n\t0x7ff843e6c53c\n"
+        },
+        "offline_page_/patients": {
+          "loaded": false,
+          "error": "Message: unknown error: net::ERR_INTERNET_DISCONNECTED\n  (Session info: chrome=142.0.7444.163)\nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t0x7ff7cc49a235\n\t0x7ff7cc1f2650\n\t0x7ff7cbf816dd\n\t0x7ff7cbf7e228\n\t0x7ff7cbf6eba9\n\t0x7ff7cbf709d7\n\t0x7ff7cbf6f160\n\t0x7ff7cbf6e917\n\t0x7ff7cbf6e5db\n\t0x7ff7cbf6c145\n\t0x7ff7cbf6c9dc\n\t0x7ff7cbf859ea\n\t0x7ff7cc02c8be\n\t0x7ff7cc002b0a\n\t0x7ff7cc02baba\n\t0x7ff7cbfcb0ed\n\t0x7ff7cbfcbf63\n\t0x7ff7cc4c5d60\n\t0x7ff7cc4bfe8a\n\t0x7ff7cc4e1005\n\t0x7ff7cc20d73e\n\t0x7ff7cc214e3f\n\t0x7ff7cc1fb7e4\n\t0x7ff7cc1fb99f\n\t0x7ff7cc1e1908\n\t0x7ff841bee8d7\n\t0x7ff843e6c53c\n"
+        },
+        "offline_page_/consultation/new": {
+          "loaded": false,
+          "error": "Message: unknown error: net::ERR_INTERNET_DISCONNECTED\n  (Session info: chrome=142.0.7444.163)\nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t0x7ff7cc49a235\n\t0x7ff7cc1f2650\n\t0x7ff7cbf816dd\n\t0x7ff7cbf7e228\n\t0x7ff7cbf6eba9\n\t0x7ff7cbf709d7\n\t0x7ff7cbf6f160\n\t0x7ff7cbf6e917\n\t0x7ff7cbf6e5db\n\t0x7ff7cbf6c145\n\t0x7ff7cbf6c9dc\n\t0x7ff7cbf859ea\n\t0x7ff7cc02c8be\n\t0x7ff7cc002b0a\n\t0x7ff7cc02baba\n\t0x7ff7cbfcb0ed\n\t0x7ff7cbfcbf63\n\t0x7ff7cc4c5d60\n\t0x7ff7cc4bfe8a\n\t0x7ff7cc4e1005\n\t0x7ff7cc20d73e\n\t0x7ff7cc214e3f\n\t0x7ff7cc1fb7e4\n\t0x7ff7cc1fb99f\n\t0x7ff7cc1e1908\n\t0x7ff841bee8d7\n\t0x7ff843e6c53c\n"
+        }
+      }
+    },
+    "lighthouse_audit": {
+      "test_name": "lighthouse_audit",
+      "timestamp": "2025-11-14T02:58:28.418046",
+      "results": {},
+      "error": "Lighthouse CLI not found. Please install: npm install -g lighthouse"
+    }
+  }
+}

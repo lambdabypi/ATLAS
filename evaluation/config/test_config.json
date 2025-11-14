@@ -1,0 +1,13 @@
+﻿{
+  "atlas_url": "https://atlas-clinical-git-main-lambdabypis-projects.vercel.app",
+  "test_settings": {
+    "lighthouse_timeout": 120,
+    "synthetic_scenarios_per_category": 25,
+    "network_conditions": ["4G", "3G", "2G", "offline"]
+  },
+  "output_settings": {
+    "save_raw_data": true,
+    "generate_visualizations": true,
+    "create_latex_tables": true
+  }
+}

@@ -1,0 +1,101 @@
+scenario_id,category,test_input,expected_protocol,resource_level,ai_response,response_time_ms,who_aligned,appropriate_recommendation,resource_aware
+1,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,basic,Simulated response for pneumonia_protocol,2097.503105856893,True,True,True
+2,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,intermediate,Simulated response for diarrhea_management,2894.8778154482197,False,True,True
+3,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,basic,Simulated response for serious_infection,3234.679215342012,True,True,True
+4,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,advanced,Simulated response for pneumonia_protocol,1770.02705685496,True,True,True
+5,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,basic,Simulated response for diarrhea_management,1992.6716171751114,True,False,False
+6,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,basic,Simulated response for serious_infection,2418.6032261940236,True,True,True
+7,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,advanced,Simulated response for pneumonia_protocol,2754.0845392894726,True,True,True
+8,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,intermediate,Simulated response for diarrhea_management,2392.590799047101,False,False,True
+9,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,basic,Simulated response for serious_infection,965.016348334836,True,True,False
+10,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,basic,Simulated response for pneumonia_protocol,1791.2102523537897,False,True,False
+11,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,basic,Simulated response for diarrhea_management,2341.4932159754912,True,True,True
+12,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,intermediate,Simulated response for serious_infection,1833.8319205425603,False,True,False
+13,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,basic,Simulated response for pneumonia_protocol,1657.941183740137,True,True,True
+14,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,intermediate,Simulated response for diarrhea_management,2142.518428802308,True,True,True
+15,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,intermediate,Simulated response for serious_infection,2103.6993721353615,False,True,True
+16,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,intermediate,Simulated response for pneumonia_protocol,1597.9287908726706,True,True,True
+17,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,intermediate,Simulated response for diarrhea_management,2806.81143981702,True,True,False
+18,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,basic,Simulated response for serious_infection,1630.3783186177832,True,True,True
+19,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,basic,Simulated response for pneumonia_protocol,1702.5669845548678,True,True,True
+20,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,basic,Simulated response for diarrhea_management,1425.9098740671539,False,True,False
+21,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,intermediate,Simulated response for serious_infection,1837.15084778249,True,True,True
+22,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,advanced,Simulated response for pneumonia_protocol,1675.8807110193766,True,True,True
+23,WHO_IMCI,"Patient: 8 months, Symptoms: diarrhea, dehydration signs",diarrhea_management,basic,Simulated response for diarrhea_management,2227.157353541779,True,True,True
+24,WHO_IMCI,"Patient: 18 months, Symptoms: fever, lethargy, poor feeding",serious_infection,basic,Simulated response for serious_infection,2750.5704585068124,True,True,True
+25,WHO_IMCI,"Patient: 2 years, Symptoms: fever, cough, fast breathing",pneumonia_protocol,basic,Simulated response for pneumonia_protocol,2083.3434352877393,True,True,True
+26,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,advanced,Simulated response for preeclampsia_management,2208.8659703201574,True,True,False
+27,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,basic,Simulated response for threatened_abortion,2020.5433647216112,False,True,True
+28,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,basic,Simulated response for fetal_monitoring,1978.9676139024725,True,False,True
+29,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,basic,Simulated response for preeclampsia_management,1770.869654278313,True,True,True
+30,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,intermediate,Simulated response for threatened_abortion,691.5687993168626,True,True,True
+31,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,basic,Simulated response for fetal_monitoring,1469.996437451265,True,True,True
+32,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,basic,Simulated response for preeclampsia_management,1701.2841677563358,True,False,True
+33,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,basic,Simulated response for threatened_abortion,2470.889701447391,False,True,True
+34,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,advanced,Simulated response for fetal_monitoring,1277.7800799565034,True,True,True
+35,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,intermediate,Simulated response for preeclampsia_management,2107.1386769986934,True,True,True
+36,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,advanced,Simulated response for threatened_abortion,2213.2329553517957,True,True,True
+37,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,intermediate,Simulated response for fetal_monitoring,1477.628141040253,True,True,True
+38,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,intermediate,Simulated response for preeclampsia_management,1418.205831883114,True,True,True
+39,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,advanced,Simulated response for threatened_abortion,1926.2367028492918,True,False,True
+40,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,basic,Simulated response for fetal_monitoring,2657.8086907724683,True,False,True
+41,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,basic,Simulated response for preeclampsia_management,2120.621732505102,True,True,True
+42,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,advanced,Simulated response for threatened_abortion,2211.4947181253096,True,True,True
+43,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,intermediate,Simulated response for fetal_monitoring,2487.8441735355946,True,True,True
+44,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,intermediate,Simulated response for preeclampsia_management,978.1316343913611,True,True,False
+45,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,basic,Simulated response for threatened_abortion,1379.9593682883406,True,True,True
+46,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,intermediate,Simulated response for fetal_monitoring,1209.3991239448487,True,True,True
+47,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,intermediate,Simulated response for preeclampsia_management,2066.2763536680322,True,True,False
+48,Maternal_Health,"Patient: 22 years, Symptoms: bleeding, cramping",threatened_abortion,intermediate,Simulated response for threatened_abortion,1881.6701872347992,True,True,False
+49,Maternal_Health,"Patient: 35 years, Symptoms: decreased fetal movement",fetal_monitoring,basic,Simulated response for fetal_monitoring,1688.6935928354183,False,True,True
+50,Maternal_Health,"Patient: 28 years, Symptoms: severe headache, BP 160/110",preeclampsia_management,advanced,Simulated response for preeclampsia_management,1499.7621480932805,True,False,True
+51,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,basic,Simulated response for cardiac_evaluation,1437.8986682329767,True,True,True
+52,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,basic,Simulated response for TB_screening,1471.4459760809702,True,True,True
+53,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,basic,Simulated response for diabetes_screening,2864.081802446601,False,True,True
+54,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,advanced,Simulated response for cardiac_evaluation,2809.7153823661947,False,True,True
+55,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,basic,Simulated response for TB_screening,3436.0637474934265,True,True,False
+56,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,intermediate,Simulated response for diabetes_screening,1198.8277028341013,True,True,True
+57,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,intermediate,Simulated response for cardiac_evaluation,1670.9234851996898,True,True,True
+58,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,intermediate,Simulated response for TB_screening,1844.4838207093537,True,True,True
+59,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,basic,Simulated response for diabetes_screening,1066.3988520130642,True,False,False
+60,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,advanced,Simulated response for cardiac_evaluation,2220.7238751751506,True,True,True
+61,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,intermediate,Simulated response for TB_screening,1195.788256065698,True,True,True
+62,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,intermediate,Simulated response for diabetes_screening,1796.0195356407273,True,False,True
+63,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,basic,Simulated response for cardiac_evaluation,2254.0439977940036,False,False,True
+64,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,basic,Simulated response for TB_screening,1833.5762336009232,True,False,True
+65,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,basic,Simulated response for diabetes_screening,1830.4435679788012,False,True,False
+66,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,intermediate,Simulated response for cardiac_evaluation,1552.0387230337428,True,False,False
+67,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,intermediate,Simulated response for TB_screening,1212.041109728243,True,True,False
+68,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,advanced,Simulated response for diabetes_screening,2134.7389005320756,False,True,True
+69,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,basic,Simulated response for cardiac_evaluation,2586.4411662253647,True,False,True
+70,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,intermediate,Simulated response for TB_screening,2653.183043236434,True,False,True
+71,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,intermediate,Simulated response for diabetes_screening,2263.1536730629714,True,True,True
+72,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,basic,Simulated response for cardiac_evaluation,1396.839266773282,True,True,True
+73,General_Medicine,"Patient: 60 years, Symptoms: chronic cough, weight loss",TB_screening,advanced,Simulated response for TB_screening,1538.8063894602371,True,False,True
+74,General_Medicine,"Patient: 35 years, Symptoms: polyuria, polydipsia, weight loss",diabetes_screening,intermediate,Simulated response for diabetes_screening,1696.1938968409086,True,True,False
+75,General_Medicine,"Patient: 45 years, Symptoms: chest pain, shortness of breath",cardiac_evaluation,intermediate,Simulated response for cardiac_evaluation,1827.4471606421678,True,True,True
+76,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,advanced,Simulated response for meningitis_protocol,1931.1748655473186,True,False,False
+77,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,basic,Simulated response for MI_protocol,1600.0713446954205,True,False,True
+78,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,intermediate,Simulated response for acute_abdomen,2508.1469698910796,True,True,True
+79,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,advanced,Simulated response for meningitis_protocol,1085.4305883718532,True,True,True
+80,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,advanced,Simulated response for MI_protocol,1742.7552468136096,False,False,False
+81,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,intermediate,Simulated response for acute_abdomen,1849.866791582904,True,True,True
+82,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,advanced,Simulated response for meningitis_protocol,1952.2809641021654,True,True,False
+83,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,basic,Simulated response for MI_protocol,1854.8378440331594,True,True,True
+84,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,intermediate,Simulated response for acute_abdomen,1357.128026994866,False,False,True
+85,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,basic,Simulated response for meningitis_protocol,2353.0479628709013,True,True,False
+86,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,basic,Simulated response for MI_protocol,2084.78143563921,True,True,True
+87,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,basic,Simulated response for acute_abdomen,2248.6060513027996,True,True,False
+88,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,basic,Simulated response for meningitis_protocol,2252.118331073251,True,False,False
+89,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,advanced,Simulated response for MI_protocol,2045.6676642062405,True,True,True
+90,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,intermediate,Simulated response for acute_abdomen,2828.4343071547064,True,True,True
+91,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,intermediate,Simulated response for meningitis_protocol,2295.5901526933553,False,False,False
+92,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,advanced,Simulated response for MI_protocol,2554.442891285202,True,True,True
+93,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,basic,Simulated response for acute_abdomen,2465.3712407767184,False,True,True
+94,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,intermediate,Simulated response for meningitis_protocol,1964.1802848772702,False,True,False
+95,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,advanced,Simulated response for MI_protocol,1811.592425968313,True,True,True
+96,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,intermediate,Simulated response for acute_abdomen,1506.4216358926592,True,False,True
+97,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,advanced,Simulated response for meningitis_protocol,1899.122390432352,True,True,False
+98,Emergency,"Patient: 55 years, Symptoms: severe chest pain, sweating",MI_protocol,advanced,Simulated response for MI_protocol,2587.5266856358994,True,True,True
+99,Emergency,"Patient: 30 years, Symptoms: severe abdominal pain, guarding",acute_abdomen,basic,Simulated response for acute_abdomen,1851.8826619704103,True,True,False
+100,Emergency,"Patient: 25 years, Symptoms: unconscious, fever, neck stiffness",meningitis_protocol,basic,Simulated response for meningitis_protocol,1908.0442628078827,False,True,True

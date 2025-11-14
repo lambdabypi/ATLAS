@@ -1,0 +1,5 @@
+,total_cases,who_aligned,alignment_percentage,appropriate_recommendations,appropriateness_percentage,resource_aware,resource_awareness_percentage
+WHO_IMCI,25,19,76.0,23,92.0,19,76.0
+Maternal_Health,25,22,88.0,20,80.0,21,84.0
+General_Medicine,25,20,80.0,17,68.0,19,76.0
+Emergency,25,19,76.0,18,72.0,15,60.0
