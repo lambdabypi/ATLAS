@@ -1,4 +1,4 @@
-// src/app/dashboard/page.js - CENTERED VERSION
+// src/app/dashboard/page.js - UPDATED WITH CENTRALIZED ONLINE STATUS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { patientDb, consultationDb } from '../../lib/db';
 import { setupAutoSync } from '../../lib/sync';
 import { syncWithClinicalPriority } from '../../lib/sync/prioritized-sync';
+import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -20,8 +21,11 @@ export default function Dashboard() {
 		recentPatients: []
 	});
 	const [loading, setLoading] = useState(true);
-	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 	const [syncStatus, setSyncStatus] = useState({ inProgress: false, lastSync: null, message: null });
+
+	// 🎯 USE CENTRALIZED ONLINE STATUS
+	const { isOnline, getStatusInfo, checkConnectivity } = useOnlineStatus();
+	const statusInfo = getStatusInfo();
 
 	// Load dashboard data from IndexedDB
 	useEffect(() => {
@@ -86,27 +90,13 @@ export default function Dashboard() {
 		setupAutoSync(15); // Try to sync every 15 minutes when online
 	}, []);
 
-	// Set up online/offline detection
-	useEffect(() => {
-		const handleOnline = () => setIsOnline(true);
-		const handleOffline = () => setIsOnline(false);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
-	}, []);
-
 	// Format date for display
 	const formatDate = (dateString) => {
 		const date = new Date(dateString);
 		return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 	};
 
-	// Handle manual sync button click
+	// Handle manual sync button click with enhanced connectivity check
 	const handleSyncClick = async () => {
 		if (!isOnline) {
 			setSyncStatus({
@@ -120,10 +110,22 @@ export default function Dashboard() {
 		setSyncStatus({
 			inProgress: true,
 			lastSync: syncStatus.lastSync,
-			message: 'Syncing data...'
+			message: 'Verifying connection and syncing data...'
 		});
 
 		try {
+			// First, verify we actually have connectivity
+			const hasConnectivity = await checkConnectivity();
+
+			if (!hasConnectivity) {
+				setSyncStatus({
+					inProgress: false,
+					lastSync: syncStatus.lastSync,
+					message: 'Connection test failed - unable to sync'
+				});
+				return;
+			}
+
 			const result = await syncWithClinicalPriority();
 
 			setSyncStatus({
@@ -175,18 +177,30 @@ export default function Dashboard() {
 		<div className="atlas-backdrop">
 			<div className="atlas-page-container">
 				<div className="atlas-content-wrapper" style={{ maxWidth: '90rem' }}>
-					{/* Header */}
+					{/* Header with Enhanced Status Display */}
 					<div className="flex justify-between items-center mb-8">
 						<div className="atlas-header-center">
 							<h1 className="atlas-title text-3xl">Clinical Dashboard</h1>
 						</div>
 
 						<div className="atlas-status-bar">
-							<div className="atlas-status flex items-center px-3 py-1 rounded-full">
-								<div className={`atlas-status-dot mr-2 ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-								<span className="text-sm text-gray-600">
-									{isOnline ? 'Online' : 'Offline'}
+							{/* 🎯 ENHANCED STATUS DISPLAY */}
+							<div className={`atlas-status flex items-center px-3 py-1 rounded-full ${statusInfo.statusColor === 'green' ? 'bg-green-50 border-green-200' :
+									statusInfo.statusColor === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+										'bg-red-50 border-red-200'
+								}`}>
+								<span className="mr-2">{statusInfo.statusIcon}</span>
+								<span className={`text-sm ${statusInfo.statusColor === 'green' ? 'text-green-800' :
+										statusInfo.statusColor === 'yellow' ? 'text-yellow-800' :
+											'text-red-800'
+									}`}>
+									{statusInfo.statusText}
 								</span>
+								{statusInfo.isSlowConnection && (
+									<Badge variant="warning" size="sm" className="ml-2">
+										Slow
+									</Badge>
+								)}
 							</div>
 
 							{isOnline && (
@@ -202,17 +216,60 @@ export default function Dashboard() {
 						</div>
 					</div>
 
-					{/* Sync Status Message */}
+					{/* Enhanced Sync Status Message */}
 					{syncStatus.message && (
-						<div className={`mb-6 p-4 rounded-lg ${syncStatus.message.includes('failed')
+						<div className={`mb-6 p-4 rounded-lg ${syncStatus.message.includes('failed') || syncStatus.message.includes('unable')
 							? 'bg-red-50 border border-red-200 text-red-800'
-							: 'bg-blue-50 border border-blue-200 text-blue-800'
+							: syncStatus.message.includes('offline')
+								? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+								: 'bg-blue-50 border border-blue-200 text-blue-800'
 							}`}>
-							{syncStatus.message}
+							<div className="flex items-center">
+								<span className="mr-2">
+									{syncStatus.message.includes('failed') || syncStatus.message.includes('unable') ? '❌' :
+										syncStatus.message.includes('offline') ? '⚠️' : 'ℹ️'}
+								</span>
+								{syncStatus.message}
+							</div>
 						</div>
 					)}
 
-					{/* Stats Grid */}
+					{/* Offline Warning Banner */}
+					{!isOnline && (
+						<div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200">
+							<div className="flex items-start">
+								<span className="mr-3 text-amber-600">⚠️</span>
+								<div>
+									<h4 className="font-medium text-amber-900">Working Offline</h4>
+									<p className="text-sm text-amber-800 mt-1">
+										You're currently offline. Data will be saved locally and synced when connection is restored.
+									</p>
+									{statusInfo.lastConnectivityCheck && (
+										<p className="text-xs text-amber-700 mt-2">
+											Last connectivity check: {new Date(statusInfo.lastConnectivityCheck).toLocaleTimeString()}
+										</p>
+									)}
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Connection Quality Warning */}
+					{isOnline && statusInfo.isSlowConnection && (
+						<div className="mb-6 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+							<div className="flex items-start">
+								<span className="mr-3 text-yellow-600">🐌</span>
+								<div>
+									<h4 className="font-medium text-yellow-900">Slow Connection Detected</h4>
+									<p className="text-sm text-yellow-800 mt-1">
+										Your connection is slower than usual. Some features may take longer to load.
+									</p>
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Stats Grid - Rest of component remains the same */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 						<Card className="atlas-card-primary">
 							<CardContent>
@@ -283,7 +340,7 @@ export default function Dashboard() {
 						</Card>
 					</div>
 
-					{/* Recent Activity Grid */}
+					{/* Recent Activity Grid - Same as before */}
 					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 						{/* Recent Consultations */}
 						<Card className="atlas-card-primary">

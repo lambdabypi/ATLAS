@@ -1,15 +1,18 @@
-// src/components/Navigation.jsx
+// src/components/layout/Navigation.jsx - UPDATED WITH CENTRALIZED ONLINE STATUS
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
 
 export default function Navigation() {
 	const pathname = usePathname();
 	const [isOpen, setIsOpen] = useState(false);
-	const [isOnline, setIsOnline] = useState(true);
-	const [connectionType, setConnectionType] = useState('unknown');
+
+	// 🎯 USE CENTRALIZED ONLINE STATUS
+	const { isOnline, getStatusInfo } = useOnlineStatus();
+	const statusInfo = getStatusInfo();
 
 	// Navigation items
 	const navItems = [
@@ -34,119 +37,6 @@ export default function Navigation() {
 			icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253'
 		},
 	];
-
-	// Internet connectivity detection
-	useEffect(() => {
-		// Check initial online status
-		const updateOnlineStatus = () => {
-			const online = navigator.onLine;
-			setIsOnline(online);
-
-			// Check connection quality if online
-			if (online) {
-				detectConnectionQuality();
-			}
-		};
-
-		// Detect connection type and quality
-		const detectConnectionQuality = () => {
-			// Use Network Information API if available
-			if ('connection' in navigator) {
-				const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-				if (connection) {
-					setConnectionType(connection.effectiveType || 'unknown');
-				}
-			}
-
-			// Fallback: Test actual connectivity with a small request
-			testRealConnectivity();
-		};
-
-		// Test real connectivity by trying to fetch a small resource
-		const testRealConnectivity = async () => {
-			try {
-				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-				const response = await fetch('https://www.google.com/favicon.ico', {
-					method: 'HEAD',
-					mode: 'no-cors',
-					signal: controller.signal,
-					cache: 'no-cache'
-				});
-
-				clearTimeout(timeoutId);
-				setIsOnline(true);
-			} catch (error) {
-				if (error.name !== 'AbortError') {
-					console.warn('Real connectivity test failed:', error.message);
-					setIsOnline(false);
-				}
-			}
-		};
-
-		// Initial check
-		updateOnlineStatus();
-
-		// Event listeners for online/offline events
-		const handleOnline = () => {
-			console.log('🟢 Network: Back online');
-			setIsOnline(true);
-			detectConnectionQuality();
-		};
-
-		const handleOffline = () => {
-			console.log('🔴 Network: Gone offline');
-			setIsOnline(false);
-			setConnectionType('offline');
-		};
-
-		// Connection change handler (for mobile networks)
-		const handleConnectionChange = () => {
-			console.log('📶 Network: Connection changed');
-			updateOnlineStatus();
-		};
-
-		// Add event listeners
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-
-		// Listen for connection changes (Network Information API)
-		if ('connection' in navigator) {
-			const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-			if (connection) {
-				connection.addEventListener('change', handleConnectionChange);
-			}
-		}
-
-		// Periodic connectivity check (every 30 seconds when online)
-		const connectivityCheckInterval = setInterval(() => {
-			if (navigator.onLine) {
-				testRealConnectivity();
-			}
-		}, 30000);
-
-		// Cleanup function
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-
-			if ('connection' in navigator) {
-				const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-				if (connection) {
-					connection.removeEventListener('change', handleConnectionChange);
-				}
-			}
-
-			clearInterval(connectivityCheckInterval);
-		};
-	}, []);
-
-	// Check if a nav item is active
-	const isActive = (href) => {
-		if (href === '/') return pathname === '/';
-		return pathname.startsWith(href);
-	};
 
 	// Apply responsive behavior with useEffect
 	useEffect(() => {
@@ -173,40 +63,13 @@ export default function Navigation() {
 		};
 	}, []);
 
-	// Get connection quality indicator
-	const getConnectionIcon = () => {
-		if (!isOnline) {
-			return '🔴'; // Red circle for offline
-		}
-
-		switch (connectionType) {
-			case 'slow-2g':
-			case '2g':
-				return '🔴'; // Red for very slow
-			case '3g':
-				return '🟡'; // Yellow for moderate
-			case '4g':
-			case '5g':
-				return '🟢'; // Green for fast
-			default:
-				return '🟢'; // Green for unknown but online
-		}
+	// Check if a nav item is active
+	const isActive = (href) => {
+		if (href === '/') return pathname === '/';
+		return pathname.startsWith(href);
 	};
 
-	// Get status text
-	const getStatusText = () => {
-		if (!isOnline) {
-			return 'Offline';
-		}
-
-		if (connectionType && connectionType !== 'unknown') {
-			return `Online (${connectionType.toUpperCase()})`;
-		}
-
-		return 'Online';
-	};
-
-	// Styles
+	// Styles with enhanced status indicators
 	const styles = {
 		nav: {
 			backgroundColor: 'white',
@@ -263,27 +126,42 @@ export default function Navigation() {
 			color: '#6b7280',
 			borderBottomColor: 'transparent',
 		},
+		// 🎯 ENHANCED STATUS INDICATOR WITH DYNAMIC COLORS
 		statusIndicator: {
 			display: 'flex',
 			alignItems: 'center',
 			marginRight: '1rem',
-			padding: '0.25rem 0.5rem',
-			backgroundColor: isOnline ? '#f0f9ff' : '#fef2f2',
-			borderRadius: '0.375rem',
-			border: `1px solid ${isOnline ? '#dbeafe' : '#fecaca'}`,
+			padding: '0.375rem 0.75rem',
+			borderRadius: '0.5rem',
+			border: '1px solid',
+			backgroundColor:
+				statusInfo.statusColor === 'green' ? '#f0f9ff' :
+					statusInfo.statusColor === 'yellow' ? '#fefbf2' :
+						'#fef2f2',
+			borderColor:
+				statusInfo.statusColor === 'green' ? '#bfdbfe' :
+					statusInfo.statusColor === 'yellow' ? '#fed7aa' :
+						'#fecaca',
 		},
 		statusDot: {
 			height: '0.5rem',
 			width: '0.5rem',
 			borderRadius: '50%',
 			marginRight: '0.5rem',
-			backgroundColor: isOnline ? '#10b981' : '#ef4444',
-			animation: isOnline ? 'none' : 'pulse 2s infinite',
+			backgroundColor:
+				statusInfo.statusColor === 'green' ? '#10b981' :
+					statusInfo.statusColor === 'yellow' ? '#f59e0b' :
+						'#ef4444',
+			// Add pulse animation for offline status
+			animation: !isOnline ? 'pulse 2s infinite' : 'none',
 		},
 		statusText: {
 			fontSize: '0.75rem',
-			color: isOnline ? '#1e40af' : '#dc2626',
 			fontWeight: '500',
+			color:
+				statusInfo.statusColor === 'green' ? '#065f46' :
+					statusInfo.statusColor === 'yellow' ? '#92400e' :
+						'#dc2626',
 		},
 		actionButton: {
 			display: 'inline-flex',
@@ -309,14 +187,16 @@ export default function Navigation() {
 			border: 'none',
 			cursor: 'pointer',
 		},
+		// 🎯 ENHANCED OFFLINE BANNER WITH BETTER STYLING
 		offlineBanner: {
-			backgroundColor: '#fef3c7',
-			color: '#92400e',
-			padding: '0.5rem',
+			backgroundColor: statusInfo.statusColor === 'red' ? '#fef2f2' : '#fef3c7',
+			color: statusInfo.statusColor === 'red' ? '#dc2626' : '#92400e',
+			padding: '0.75rem',
 			textAlign: 'center',
 			fontSize: '0.875rem',
 			fontWeight: '500',
-			display: isOnline ? 'none' : 'block',
+			display: !isOnline ? 'block' : 'none',
+			borderBottom: `1px solid ${statusInfo.statusColor === 'red' ? '#fecaca' : '#fed7aa'}`,
 		},
 	};
 
@@ -327,13 +207,39 @@ export default function Navigation() {
 					0%, 100% { opacity: 1; }
 					50% { opacity: 0.5; }
 				}
+				.status-slow-connection {
+					animation: pulse 3s infinite;
+				}
 			`}</style>
 
 			<nav style={styles.nav}>
-				{/* Offline banner */}
+				{/* 🎯 ENHANCED OFFLINE/CONNECTION BANNER */}
 				{!isOnline && (
 					<div style={styles.offlineBanner}>
-						⚠️ You're currently offline. Data will sync when connection is restored.
+						<div className="flex items-center justify-center">
+							<span className="mr-2">⚠️</span>
+							<span>You're currently offline. Data will sync when connection is restored.</span>
+							{statusInfo.lastConnectivityCheck && (
+								<span className="ml-2 text-xs opacity-75">
+									(Last check: {new Date(statusInfo.lastConnectivityCheck).toLocaleTimeString()})
+								</span>
+							)}
+						</div>
+					</div>
+				)}
+
+				{/* Show slow connection warning */}
+				{isOnline && statusInfo.isSlowConnection && (
+					<div style={{
+						...styles.offlineBanner,
+						backgroundColor: '#fef3c7',
+						color: '#92400e',
+						display: 'block'
+					}}>
+						<div className="flex items-center justify-center">
+							<span className="mr-2">🐌</span>
+							<span>Slow connection detected. Some features may be slower than usual.</span>
+						</div>
 					</div>
 				)}
 
@@ -354,11 +260,10 @@ export default function Navigation() {
 									};
 
 									return (
-										<Link
-											key={item.name}
-											href={item.href}
-											style={navLinkStyle}
-										>
+										<Link key={item.name} href={item.href} style={navLinkStyle}>
+											<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+											</svg>
 											{item.name}
 										</Link>
 									);
@@ -366,97 +271,97 @@ export default function Navigation() {
 							</div>
 						</div>
 
-						<div style={styles.navLinkContainer}>
-							{/* Enhanced Online/Offline indicator */}
-							<div style={styles.statusIndicator} title={`Connection: ${getStatusText()}`}>
+						<div style={{ display: 'flex', alignItems: 'center' }}>
+							{/* 🎯 ENHANCED STATUS INDICATOR */}
+							<div
+								style={styles.statusIndicator}
+								className={statusInfo.isSlowConnection ? 'status-slow-connection' : ''}
+								title={`${statusInfo.statusText}${statusInfo.lastConnectivityCheck ? ` - Last check: ${new Date(statusInfo.lastConnectivityCheck).toLocaleString()}` : ''}`}
+							>
 								<div style={styles.statusDot}></div>
-								<span style={styles.statusText}>{getStatusText()}</span>
+								<span style={styles.statusText}>
+									{statusInfo.statusText}
+								</span>
+								{statusInfo.isSlowConnection && (
+									<span style={{
+										...styles.statusText,
+										marginLeft: '0.5rem',
+										opacity: 0.8
+									}}>
+										(Slow)
+									</span>
+								)}
 							</div>
 
-							{/* Quick actions */}
-							<Link
-								href="/consultation/new"
-								style={styles.actionButton}
-								onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-								onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
-							>
-								New Consultation
-							</Link>
-						</div>
-
-						{/* Mobile menu button */}
-						<button
-							id="mobile-menu-button"
-							type="button"
-							style={styles.mobileMenuButton}
-							onClick={() => setIsOpen(!isOpen)}
-						>
-							<span style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden' }}>
-								Open main menu
-							</span>
-							{isOpen ? (
-								<svg style={{ height: '1.5rem', width: '1.5rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							) : (
-								<svg style={{ height: '1.5rem', width: '1.5rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-								</svg>
+							{/* Action button - only show if online */}
+							{isOnline && (
+								<Link href="/consultation/new" style={styles.actionButton}>
+									New Consultation
+								</Link>
 							)}
-						</button>
+
+							{/* Mobile menu button */}
+							<button
+								id="mobile-menu-button"
+								style={styles.mobileMenuButton}
+								onClick={() => setIsOpen(!isOpen)}
+							>
+								<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
+								</svg>
+							</button>
+						</div>
 					</div>
 
 					{/* Mobile menu */}
 					{isOpen && (
-						<div style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-							{/* Mobile status indicator */}
-							<div style={{
-								...styles.statusIndicator,
-								margin: '0.5rem 1rem',
-								justifyContent: 'center',
-							}}>
-								<div style={styles.statusDot}></div>
-								<span style={styles.statusText}>{getStatusText()}</span>
-							</div>
+						<div className="sm:hidden">
+							<div className="px-2 pt-2 pb-3 space-y-1 bg-gray-50 rounded-lg mt-2">
+								{navItems.map((item) => {
+									const active = isActive(item.href);
+									return (
+										<Link
+											key={item.name}
+											href={item.href}
+											className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${active
+												? 'text-gray-900 bg-gray-200'
+												: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+												}`}
+											onClick={() => setIsOpen(false)}
+										>
+											<div className="flex items-center">
+												<svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+												</svg>
+												{item.name}
+											</div>
+										</Link>
+									);
+								})}
 
-							{navItems.map((item) => {
-								const active = isActive(item.href);
+								{/* Mobile status display */}
+								<div className="px-3 py-2 text-sm">
+									<div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusInfo.statusColor === 'green' ? 'bg-green-100 text-green-800' :
+										statusInfo.statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+											'bg-red-100 text-red-800'
+										}`}>
+										<span className="mr-1">{statusInfo.statusIcon}</span>
+										{statusInfo.statusText}
+									</div>
+								</div>
 
-								return (
-									<Link
-										key={item.name}
-										href={item.href}
-										style={{
-											display: 'block',
-											padding: '0.75rem 1rem',
-											fontSize: '1rem',
-											fontWeight: '500',
-											textDecoration: 'none',
-											borderLeftWidth: '4px',
-											borderLeftColor: active ? '#3b82f6' : 'transparent',
-											backgroundColor: active ? '#eff6ff' : 'transparent',
-											color: active ? '#1d4ed8' : '#4b5563',
-										}}
-										onClick={() => setIsOpen(false)}
-									>
-										{item.name}
-									</Link>
-								);
-							})}
-
-							{/* Mobile action button */}
-							<div style={{ padding: '1rem' }}>
-								<Link
-									href="/consultation/new"
-									style={{
-										...styles.actionButton,
-										width: '100%',
-										justifyContent: 'center',
-									}}
-									onClick={() => setIsOpen(false)}
-								>
-									New Consultation
-								</Link>
+								{/* Mobile action button */}
+								{isOnline && (
+									<div className="px-3 py-2">
+										<Link
+											href="/consultation/new"
+											className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+											onClick={() => setIsOpen(false)}
+										>
+											New Consultation
+										</Link>
+									</div>
+								)}
 							</div>
 						</div>
 					)}

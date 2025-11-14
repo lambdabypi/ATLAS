@@ -1,11 +1,13 @@
-// src/app/page.js - FULLY SSR COMPATIBLE VERSION WITH RELOAD FIX
+// src/app/page.js - UPDATED WITH CENTRALIZED ONLINE STATUS
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { initializeEnhancedAtlas } from '../lib/initializeEnhancedAtlas';
 import { useUserSystem } from '../lib/auth/simpleUserSystem';
+import { useOnlineStatus } from '../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
 import { UserSelection } from '../components/auth/UserSelection';
+import ConnectionStatus from '../components/ui/ConnectionStatus'; // 🎯 REUSABLE COMPONENT
 
 console.log('Build-time Gemini API Key check:', {
 	hasKey: typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY,
@@ -62,7 +64,6 @@ const cardData = [
 export default function Home() {
 	// ✅ ALWAYS call all hooks at the top level - no conditional hooks
 	const [isDbInitialized, setIsDbInitialized] = useState(false);
-	const [isOnline, setIsOnline] = useState(true); // Default to true for SSR
 	const [initializationError, setInitializationError] = useState(null);
 	const [isInitializing, setIsInitializing] = useState(false);
 	const [isClientSide, setIsClientSide] = useState(false); // Track if we're on client
@@ -73,13 +74,13 @@ export default function Home() {
 	// ✅ ALWAYS call user system hook
 	const { currentUser, isInitialized: userSystemInitialized } = useUserSystem();
 
+	// 🎯 USE CENTRALIZED ONLINE STATUS
+	const { isOnline, getStatusInfo } = useOnlineStatus();
+	const statusInfo = getStatusInfo();
+
 	// ✅ Client-side detection effect - runs first
 	useEffect(() => {
 		setIsClientSide(true);
-		// Initialize network status only on client-side
-		if (typeof navigator !== 'undefined') {
-			setIsOnline(navigator.onLine);
-		}
 	}, []);
 
 	// ✅ Lazy load performance monitor (client-side only)
@@ -151,12 +152,6 @@ export default function Home() {
 	// IMPROVED SERVICE WORKER REGISTRATION WITH RELOAD FIX
 	useEffect(() => {
 		if (!isClientSide) return;
-
-		const handleOnline = () => setIsOnline(true);
-		const handleOffline = () => setIsOnline(false);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
 
 		// IMPROVED SERVICE WORKER REGISTRATION
 		if ('serviceWorker' in navigator) {
@@ -273,11 +268,6 @@ export default function Home() {
 				window.removeEventListener('beforeunload', handleBeforeUnload);
 			};
 		}
-
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
 	}, [isClientSide, userSystemInitialized, currentUser]);
 
 	// Handle keyboard shortcuts - only in browser
@@ -400,6 +390,9 @@ export default function Home() {
 			{/* Use the atlas-page-container class for centering */}
 			<div className="atlas-page-container">
 				<div className="atlas-content-wrapper">
+					{/* 🎯 CONNECTION STATUS BANNER */}
+					<ConnectionStatus variant="banner" showLastCheck={true} className="mb-8" />
+
 					{/* Streamlined Header with proper centering */}
 					<header className="atlas-header-center mb-16">
 						<div className="inline-flex items-center gap-4 mb-6">
@@ -428,7 +421,7 @@ export default function Home() {
 							</div>
 						)}
 
-						{/* Clean Status Bar with centering */}
+						{/* 🎯 ENHANCED STATUS BAR WITH CENTRALIZED STATUS */}
 						<div className="atlas-status-bar">
 							{/* System Status */}
 							{isInitializing ? (
@@ -448,13 +441,8 @@ export default function Home() {
 								</div>
 							)}
 
-							{/* Network Status */}
-							<div className={`atlas-status flex items-center gap-3 px-4 py-2 rounded-full ${isOnline ? 'bg-green-50/80 text-green-700' : 'bg-amber-50/80 text-amber-700'
-								}`}>
-								<div className={`atlas-status-dot ${isOnline ? 'bg-green-500' : 'bg-amber-500'
-									}`}></div>
-								<span>{isOnline ? 'Online' : 'Offline'}</span>
-							</div>
+							{/* 🎯 CENTRALIZED NETWORK STATUS */}
+							<ConnectionStatus variant="compact" />
 						</div>
 					</header>
 
@@ -464,6 +452,13 @@ export default function Home() {
 						<section>
 							<h2 className="atlas-section-header">
 								Quick Actions
+								{/* Show additional context based on connection status */}
+								{!isOnline && (
+									<span className="text-sm font-normal text-amber-600 ml-2">(Offline Mode)</span>
+								)}
+								{isOnline && statusInfo.isSlowConnection && (
+									<span className="text-sm font-normal text-yellow-600 ml-2">(Slow Connection)</span>
+								)}
 							</h2>
 							<div className="grid grid-cols-1 gap-6">
 								{cardData.filter(card => card.priority === 'high').map((card, index) => (
@@ -476,6 +471,13 @@ export default function Home() {
 												<div className="flex-grow">
 													<h3 className="text-2xl font-semibold text-gray-900 mb-2">
 														{card.title}
+														{/* Show offline/slow indicators */}
+														{!isOnline && card.title === 'New Consultation' && (
+															<span className="text-sm font-normal text-amber-600 ml-2">(Limited offline)</span>
+														)}
+														{isOnline && statusInfo.isSlowConnection && card.title === 'New Consultation' && (
+															<span className="text-sm font-normal text-yellow-600 ml-2">(May be slow)</span>
+														)}
 													</h3>
 													<p className="text-gray-600 text-lg">
 														{card.description}
@@ -519,12 +521,29 @@ export default function Home() {
 						</section>
 					</main>
 
-					{/* Quick Help */}
+					{/* Quick Help with Connection-Aware Tips */}
 					<footer className="mt-16 text-center">
 						<div className="atlas-help-footer inline-flex items-center gap-3">
 							<span className="text-lg">💡</span>
-							<span>Use Alt + letter shortcuts for faster navigation</span>
+							<span>
+								Use Alt + letter shortcuts for faster navigation
+								{!isOnline && " (Works offline)"}
+								{isOnline && statusInfo.isSlowConnection && " (Faster than clicking)"}
+							</span>
 						</div>
+
+						{/* 🎯 CONNECTION TIPS */}
+						{!isOnline && (
+							<div className="mt-4 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg max-w-lg mx-auto">
+								<strong>Offline Mode:</strong> All data is saved locally and will sync when you're back online.
+							</div>
+						)}
+
+						{isOnline && statusInfo.isSlowConnection && (
+							<div className="mt-4 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-lg max-w-lg mx-auto">
+								<strong>Slow Connection:</strong> Consider using keyboard shortcuts and the Standard consultation form for better performance.
+							</div>
+						)}
 					</footer>
 				</div>
 			</div>
