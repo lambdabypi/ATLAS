@@ -1,7 +1,8 @@
-// src/lib/utils/networkDetection.js - Robust network connectivity detection
+// src/lib/utils/networkDetection.js - SSR-Safe robust network connectivity detection
 export class NetworkDetector {
 	constructor() {
-		this.isOnline = navigator.onLine;
+		// SSR-safe initialization
+		this.isOnline = typeof window !== 'undefined' ? navigator.onLine : true;
 		this.lastConnectivityCheck = 0;
 		this.connectivityCheckInterval = 30000; // 30 seconds
 		this.fastCheckInterval = 5000; // 5 seconds when suspected offline
@@ -12,14 +13,21 @@ export class NetworkDetector {
 		];
 		this.listeners = new Set();
 		this.isChecking = false;
+		this.isBrowser = typeof window !== 'undefined';
 
-		this.setupEventListeners();
-		this.startPeriodicChecks();
-
-		console.log('🌐 Robust network detector initialized');
+		// Only initialize in browser environment
+		if (this.isBrowser) {
+			this.setupEventListeners();
+			this.startPeriodicChecks();
+			console.log('🌐 Robust network detector initialized (browser)');
+		} else {
+			console.log('🌐 Network detector initialized (server-side - assuming online)');
+		}
 	}
 
 	setupEventListeners() {
+		if (!this.isBrowser) return;
+
 		window.addEventListener('online', () => {
 			console.log('🌐 Browser reports online - verifying...');
 			this.verifyConnectivity();
@@ -67,6 +75,8 @@ export class NetworkDetector {
 	}
 
 	handleNetworkError() {
+		if (!this.isBrowser) return;
+
 		if (this.isOnline) {
 			console.warn('🔍 Network error detected - checking connectivity...');
 			this.verifyConnectivity();
@@ -74,7 +84,7 @@ export class NetworkDetector {
 	}
 
 	async verifyConnectivity() {
-		if (this.isChecking) return;
+		if (!this.isBrowser || this.isChecking) return;
 
 		this.isChecking = true;
 		const now = Date.now();
@@ -116,6 +126,8 @@ export class NetworkDetector {
 	}
 
 	async fallbackConnectivityTest() {
+		if (!this.isBrowser) return Promise.resolve();
+
 		// Try to create a simple image request as a last resort
 		return new Promise((resolve, reject) => {
 			const img = new Image();
@@ -143,20 +155,27 @@ export class NetworkDetector {
 	setOnlineStatus(online) {
 		if (this.isOnline !== online) {
 			this.isOnline = online;
-			console.log(`📶 Network status changed: ${online ? 'ONLINE' : 'OFFLINE'}`);
+
+			if (this.isBrowser) {
+				console.log(`📶 Network status changed: ${online ? 'ONLINE' : 'OFFLINE'}`);
+			}
 
 			// Notify all listeners
 			this.listeners.forEach(callback => {
 				try {
 					callback(online);
 				} catch (error) {
-					console.error('Network status callback error:', error);
+					if (this.isBrowser) {
+						console.error('Network status callback error:', error);
+					}
 				}
 			});
 		}
 	}
 
 	startPeriodicChecks() {
+		if (!this.isBrowser) return;
+
 		const checkConnectivity = async () => {
 			const now = Date.now();
 			const timeSinceLastCheck = now - this.lastConnectivityCheck;
@@ -191,15 +210,45 @@ export class NetworkDetector {
 	}
 
 	async forceConnectivityCheck() {
+		if (!this.isBrowser) return this.isOnline;
+
 		await this.verifyConnectivity();
 		return this.isOnline;
 	}
 }
 
-// Singleton instance
-export const networkDetector = new NetworkDetector();
+// SSR-safe singleton instance
+let networkDetectorInstance = null;
 
-// Convenience functions
-export const isOnline = () => networkDetector.getOnlineStatus();
-export const addNetworkListener = (callback) => networkDetector.addListener(callback);
-export const checkConnectivity = () => networkDetector.forceConnectivityCheck();
+export const getNetworkDetector = () => {
+	if (!networkDetectorInstance) {
+		networkDetectorInstance = new NetworkDetector();
+	}
+	return networkDetectorInstance;
+};
+
+// SSR-safe convenience functions
+export const isOnline = () => {
+	if (typeof window === 'undefined') return true; // Assume online on server
+	return getNetworkDetector().getOnlineStatus();
+};
+
+export const addNetworkListener = (callback) => {
+	if (typeof window === 'undefined') {
+		// Return noop unsubscribe function for server-side
+		return () => { };
+	}
+	return getNetworkDetector().addListener(callback);
+};
+
+export const checkConnectivity = () => {
+	if (typeof window === 'undefined') return Promise.resolve(true);
+	return getNetworkDetector().forceConnectivityCheck();
+};
+
+// Legacy export for backwards compatibility
+export const networkDetector = typeof window !== 'undefined' ? getNetworkDetector() : {
+	getOnlineStatus: () => true,
+	addListener: () => () => { },
+	forceConnectivityCheck: () => Promise.resolve(true)
+};

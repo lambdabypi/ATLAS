@@ -1,11 +1,11 @@
-// src/lib/ai/enhancedHybridAI.js - FIXED OFFLINE RAG USAGE
-// Updated to properly use RAG system when offline instead of always falling back to rule-based
+// src/lib/ai/enhancedHybridAI.js - SSR-SAFE FIXED OFFLINE RAG USAGE
+// Updated to properly use RAG system when offline with SSR-safe network detection
 
 import { getPracticalLocalRecommendations, getPracticalLocalStatus } from './practicalLocalAI';
 import { getClinicalRecommendations as getGeminiRecommendations, getModelStatus } from './gemini';
 import { getClinicalRAGRecommendations, initializeClinicalRAG } from './clinicalRAGSystem';
 import { getRelevantGuidelines } from '../db/expandedGuidelines';
-import { networkDetector, addNetworkListener } from '../utils/networkDetection';
+import { isOnline, addNetworkListener } from '../utils/networkDetection';
 
 // FIXED: Updated configuration prioritizing RAG when offline
 const HYBRID_CONFIG = {
@@ -54,29 +54,39 @@ class EnhancedHybridManager {
 			}
 		};
 
-		this.isOnline = networkDetector.getOnlineStatus();
 		this.lastSelection = null;
 		this.ragInitialized = false;
 		this.ragInitializing = false;
 		this.ragSystemInstance = null;
+		this.networkUnsubscribe = null;
 
-		// Listen for connectivity changes
-		this.networkUnsubscribe = addNetworkListener((online) => {
-			this.isOnline = online;
-			if (online) {
-				console.log('🌐 Network restored - Gemini now preferred');
-			} else {
-				console.log('📱 Network lost - RAG system now preferred');
-			}
-		});
+		// SSR-safe initialization
+		this.isOnline = isOnline();
+		this.isBrowser = typeof window !== 'undefined';
 
-		this.autoInitializeRAG();
+		if (this.isBrowser) {
+			// Only set up network listeners in browser
+			this.networkUnsubscribe = addNetworkListener((online) => {
+				this.isOnline = online;
+				if (online) {
+					console.log('🌐 Network restored - Gemini now preferred');
+				} else {
+					console.log('📱 Network lost - RAG system now preferred');
+				}
+			});
+
+			// Auto-initialize RAG system in browser
+			this.autoInitializeRAG();
+		} else {
+			// Server-side: assume online and don't auto-initialize
+			console.log('🤖 Enhanced Hybrid Manager initialized (server-side)');
+		}
 
 		console.log('🤖 Enhanced Hybrid Manager initialized (RAG-first when offline)');
 	}
 
 	async autoInitializeRAG() {
-		if (this.ragInitializing || this.ragInitialized) {
+		if (this.ragInitializing || this.ragInitialized || !this.isBrowser) {
 			return;
 		}
 
@@ -114,7 +124,7 @@ class EnhancedHybridManager {
 				this.ragSystemInstance = result.system;
 				console.log('✅ Clinical RAG system ready - can provide offline clinical support');
 
-				if (typeof window !== 'undefined') {
+				if (this.isBrowser && typeof window !== 'undefined') {
 					window.dispatchEvent(new CustomEvent('atlas:rag-initialized', {
 						detail: { success: true }
 					}));
@@ -189,6 +199,7 @@ class EnhancedHybridManager {
 			console.error('Enhanced hybrid AI system error:', error);
 
 			// FIXED: Try RAG system before falling back to rule-based
+			const systemStatus = await this.getSystemStatus();
 			if (this.ragInitialized && systemStatus?.models?.clinicalRAG?.available) {
 				console.log('🔄 Trying RAG system as final fallback...');
 				try {
@@ -653,6 +664,13 @@ Please refer to available clinical guidelines and use your professional judgment
 			embeddingsSupported: true,
 			offlineMode: !this.isOnline
 		};
+	}
+
+	// Cleanup method
+	destroy() {
+		if (this.networkUnsubscribe) {
+			this.networkUnsubscribe();
+		}
 	}
 }
 
