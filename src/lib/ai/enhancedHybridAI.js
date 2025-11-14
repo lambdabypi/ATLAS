@@ -1,17 +1,16 @@
-// src/lib/ai/enhancedHybridAI.js - COMPLETE FIXED VERSION
-// Prioritizes Gemini when online, fixes domain detection, and improves model selection
-// FIXED: Removed undefined getStatus error and properly handles RAG system instances
+// src/lib/ai/enhancedHybridAI.js - FIXED OFFLINE RAG USAGE
+// Updated to properly use RAG system when offline instead of always falling back to rule-based
 
 import { getPracticalLocalRecommendations, getPracticalLocalStatus } from './practicalLocalAI';
-import { getClinicalRecommendations as getGeminiRecommendations } from './gemini';
+import { getClinicalRecommendations as getGeminiRecommendations, getModelStatus } from './gemini';
 import { getClinicalRAGRecommendations, initializeClinicalRAG } from './clinicalRAGSystem';
 import { getRelevantGuidelines } from '../db/expandedGuidelines';
 
-// FIXED: Updated configuration prioritizing Gemini when online
+// FIXED: Updated configuration prioritizing RAG when offline
 const HYBRID_CONFIG = {
 	// Model selection thresholds
-	complexQueryMinLength: 500, // INCREASED from 300 to reduce false positives
-	simpleQueryMaxLength: 50,   // NEW: Simple queries under 50 chars
+	complexQueryMinLength: 500,
+	simpleQueryMaxLength: 50,
 
 	emergencyKeywords: [
 		'emergency', 'urgent', 'critical', 'severe', 'unconscious',
@@ -19,19 +18,17 @@ const HYBRID_CONFIG = {
 		'shock', 'collapse', 'poisoning', 'overdose'
 	],
 
-	// FIXED: Performance settings favoring Gemini when online
+	// Performance settings
 	maxResponseTime: 15000,
 	preferredResponseTime: 5000,
 	localAIConfidenceThreshold: 0.7,
 
-	// FIXED: Prioritize Gemini when online instead of offline-first
-	prioritizeGeminiWhenOnline: true, // NEW SETTING
-	prioritizeOffline: false,         // CHANGED to false
+	// FIXED: Offline-first RAG configuration
+	prioritizeGeminiWhenOnline: true,
+	prioritizeRAGWhenOffline: true,    // NEW: Use RAG as primary offline system
 	enableFallbackChain: true,
-
-	// RAG configuration
 	enableRAG: true,
-	ragAsPreferred: false, // CHANGED: Don't prefer RAG over Gemini
+	ragAsPreferred: true,              // NEW: Prefer RAG over rule-based when available
 };
 
 class EnhancedHybridManager {
@@ -46,10 +43,11 @@ class EnhancedHybridManager {
 			modelSelectionReasons: {
 				'rule-based-local': 0,
 				'clinical-rag': 0,
+				'clinical-rag-offline': 0,  // NEW: Track offline RAG usage
 				'local-emergency': 0,
-				'gemini-simple': 0,      // NEW
+				'gemini-simple': 0,
 				'gemini-complex': 0,
-				'gemini-preferred': 0,    // NEW
+				'gemini-preferred': 0,
 				'offline-fallback': 0,
 				'error-recovery': 0
 			}
@@ -59,7 +57,7 @@ class EnhancedHybridManager {
 		this.lastSelection = null;
 		this.ragInitialized = false;
 		this.ragInitializing = false;
-		this.ragSystemInstance = null; // FIXED: Store RAG system instance
+		this.ragSystemInstance = null;
 
 		// Listen for connectivity changes
 		if (typeof window !== 'undefined') {
@@ -69,13 +67,13 @@ class EnhancedHybridManager {
 			});
 			window.addEventListener('offline', () => {
 				this.isOnline = false;
-				console.log('📱 Offline mode - Using local systems');
+				console.log('📱 Offline mode - RAG system now preferred');  // UPDATED MESSAGE
 			});
 
 			this.autoInitializeRAG();
 		}
 
-		console.log('🤖 Fixed Hybrid Manager initialized (Gemini-first when online)');
+		console.log('🤖 Enhanced Hybrid Manager initialized (RAG-first when offline)');
 	}
 
 	async autoInitializeRAG() {
@@ -91,7 +89,7 @@ class EnhancedHybridManager {
 
 			const result = await this.initializeRAGSystem();
 			if (result.success) {
-				console.log('✅ RAG system auto-initialized successfully');
+				console.log('✅ RAG system auto-initialized successfully - available for offline use');
 			} else {
 				console.warn('⚠️ RAG auto-initialization failed:', result.message);
 			}
@@ -114,8 +112,8 @@ class EnhancedHybridManager {
 
 			if (result.success) {
 				this.ragInitialized = true;
-				this.ragSystemInstance = result.system; // FIXED: Store the system instance
-				console.log('✅ Clinical RAG system ready');
+				this.ragSystemInstance = result.system;
+				console.log('✅ Clinical RAG system ready - can provide offline clinical support');
 
 				if (typeof window !== 'undefined') {
 					window.dispatchEvent(new CustomEvent('atlas:rag-initialized', {
@@ -143,7 +141,8 @@ class EnhancedHybridManager {
 		this.stats.totalQueries++;
 
 		try {
-			console.log('🤖 Starting FIXED hybrid AI analysis...');
+			console.log('🤖 Starting enhanced hybrid AI analysis...');
+			console.log(`📶 Network status: ${this.isOnline ? 'Online' : 'Offline'}`);
 
 			const systemStatus = await this.getSystemStatus();
 
@@ -151,12 +150,13 @@ class EnhancedHybridManager {
 				online: this.isOnline,
 				geminiAvailable: systemStatus.models.gemini.available,
 				ragAvailable: systemStatus.models.clinicalRAG.available,
+				ragInitialized: this.ragInitialized,
 				ruleBasedLocal: systemStatus.models.localAI.available
 			});
 
-			// FIXED: Enhanced model selection prioritizing Gemini when online
-			const selection = await this.selectOptimalModelFixed(query, patientData, options, systemStatus);
-			console.log('FIXED Model selection:', selection);
+			// FIXED: Enhanced model selection with proper offline RAG priority
+			const selection = await this.selectOptimalModelWithOfflineRAG(query, patientData, options, systemStatus);
+			console.log('🎯 Model selection:', selection);
 
 			// Get relevant guidelines for context
 			const guidelines = relevantMedicalData?.guidelines ||
@@ -189,13 +189,34 @@ class EnhancedHybridManager {
 		} catch (error) {
 			console.error('Enhanced hybrid AI system error:', error);
 
+			// FIXED: Try RAG system before falling back to rule-based
+			if (this.ragInitialized && systemStatus?.models?.clinicalRAG?.available) {
+				console.log('🔄 Trying RAG system as final fallback...');
+				try {
+					const ragFallback = await getClinicalRAGRecommendations(query, patientData, options);
+					this.stats.ragQueries++;
+
+					return {
+						...ragFallback,
+						selectedModel: 'clinical-rag-emergency',
+						selectionReason: 'system-error-rag-fallback',
+						error: error.message,
+						responseTime: performance.now() - startTime,
+						hybridCapable: true
+					};
+				} catch (ragError) {
+					console.warn('RAG fallback also failed:', ragError);
+				}
+			}
+
+			// Final fallback to rule-based
 			const fallbackResult = await getPracticalLocalRecommendations(query, patientData, options);
 			this.stats.fallbackQueries++;
 
 			return {
 				...fallbackResult,
 				selectedModel: 'emergency-fallback',
-				selectionReason: 'system-error-recovery',
+				selectionReason: 'all-systems-failed',
 				error: error.message,
 				responseTime: performance.now() - startTime,
 				hybridCapable: true
@@ -203,8 +224,8 @@ class EnhancedHybridManager {
 		}
 	}
 
-	// FIXED: Model selection logic prioritizing Gemini when online
-	async selectOptimalModelFixed(query, patientData, options, systemStatus) {
+	// FIXED: Model selection logic that prioritizes RAG when offline
+	async selectOptimalModelWithOfflineRAG(query, patientData, options, systemStatus) {
 		// User preference override (with availability check)
 		if (options.modelPreference === 'rule-based' || options.modelPreference === 'local-rules') {
 			this.stats.modelSelectionReasons['rule-based-local']++;
@@ -216,7 +237,7 @@ class EnhancedHybridManager {
 				this.stats.modelSelectionReasons['clinical-rag']++;
 				return { model: 'clinical-rag', reason: 'user-preference-rag', confidence: 'high' };
 			} else {
-				console.warn('RAG requested but not available, falling back to Gemini');
+				console.warn('RAG requested but not available');
 				if (systemStatus.models.gemini.available && this.isOnline) {
 					this.stats.modelSelectionReasons['gemini-preferred']++;
 					return { model: 'gemini', reason: 'rag-unavailable-gemini-fallback', confidence: 'high' };
@@ -234,8 +255,8 @@ class EnhancedHybridManager {
 			}
 		}
 
-		// FIXED: Intelligent auto-selection based on clinical context
-		const clinicalAnalysis = this.analyzeClinicalContextFixed(query, patientData);
+		// Intelligent auto-selection based on clinical context
+		const clinicalAnalysis = this.analyzeClinicalContext(query, patientData);
 
 		console.log('📊 Clinical Analysis:', clinicalAnalysis);
 
@@ -243,71 +264,79 @@ class EnhancedHybridManager {
 		if (clinicalAnalysis.isEmergency || clinicalAnalysis.isCritical) {
 			console.log('🚨 Emergency case detected');
 
-			// Priority: Gemini > RAG > Rules
-			if (systemStatus.models.gemini.available && this.isOnline) {
+			if (this.isOnline && systemStatus.models.gemini.available) {
 				this.stats.modelSelectionReasons['gemini-complex']++;
 				return { model: 'gemini', reason: 'emergency-gemini-preferred', confidence: 'high' };
 			} else if (systemStatus.models.clinicalRAG.available) {
-				this.stats.modelSelectionReasons['clinical-rag']++;
-				return { model: 'clinical-rag', reason: 'emergency-rag-available', confidence: 'high' };
+				console.log('🏥 Using RAG for emergency case (offline)');
+				this.stats.modelSelectionReasons['clinical-rag-offline']++;
+				return { model: 'clinical-rag', reason: 'emergency-rag-offline', confidence: 'high' };
 			} else {
 				this.stats.modelSelectionReasons['rule-based-local']++;
 				return { model: 'rule-based-local', reason: 'emergency-rules-only', confidence: 'medium' };
 			}
 		}
 
-		// FIXED: Simple queries - prefer Gemini when online
-		if (clinicalAnalysis.isSimple) {
-			console.log('📝 Simple query detected');
-
-			if (systemStatus.models.gemini.available && this.isOnline) {
-				this.stats.modelSelectionReasons['gemini-simple']++;
-				return { model: 'gemini', reason: 'simple-gemini-preferred', confidence: 'high' };
-			} else if (systemStatus.models.clinicalRAG.available) {
-				this.stats.modelSelectionReasons['clinical-rag']++;
-				return { model: 'clinical-rag', reason: 'simple-rag-available', confidence: 'medium' };
-			} else {
-				this.stats.modelSelectionReasons['rule-based-local']++;
-				return { model: 'rule-based-local', reason: 'simple-rules-fallback', confidence: 'medium' };
+		// ONLINE LOGIC - Prefer Gemini when online
+		if (this.isOnline) {
+			if (systemStatus.models.gemini.available) {
+				if (clinicalAnalysis.isSimple) {
+					console.log('📝 Simple query - using Gemini (online)');
+					this.stats.modelSelectionReasons['gemini-simple']++;
+					return { model: 'gemini', reason: 'simple-gemini-preferred', confidence: 'high' };
+				} else if (clinicalAnalysis.isComplex) {
+					console.log('🧠 Complex case - using Gemini (online)');
+					this.stats.modelSelectionReasons['gemini-complex']++;
+					return { model: 'gemini', reason: 'complex-gemini-preferred', confidence: 'high' };
+				} else {
+					console.log('🌐 Default - using Gemini (online)');
+					this.stats.modelSelectionReasons['gemini-preferred']++;
+					return { model: 'gemini', reason: 'online-gemini-preferred', confidence: 'high' };
+				}
 			}
 		}
 
-		// Complex clinical cases - prefer Gemini when online
-		if (clinicalAnalysis.isComplex) {
-			console.log('🧠 Complex case detected');
+		// OFFLINE LOGIC - Prefer RAG over rule-based when available
+		if (!this.isOnline) {
+			console.log('📱 Offline mode - selecting best local system');
 
-			// FIXED: Priority order - Gemini first when online
-			if (systemStatus.models.gemini.available && this.isOnline) {
-				this.stats.modelSelectionReasons['gemini-complex']++;
-				return { model: 'gemini', reason: 'complex-gemini-preferred', confidence: 'high' };
-			} else if (systemStatus.models.clinicalRAG.available) {
-				this.stats.modelSelectionReasons['clinical-rag']++;
-				return { model: 'clinical-rag', reason: 'complex-rag-offline', confidence: 'medium' };
-			} else {
+			if (systemStatus.models.clinicalRAG.available && this.ragInitialized) {
+				console.log('📚 Using Clinical RAG system (offline preferred)');
+				this.stats.modelSelectionReasons['clinical-rag-offline']++;
+				return {
+					model: 'clinical-rag',
+					reason: 'offline-rag-preferred',
+					confidence: 'high',
+					offline: true
+				};
+			} else if (systemStatus.models.clinicalRAG.initializing) {
+				console.log('⏳ RAG system still initializing, using rules temporarily');
 				this.stats.modelSelectionReasons['rule-based-local']++;
-				return { model: 'rule-based-local', reason: 'complex-rules-only', confidence: 'low' };
+				return {
+					model: 'rule-based-local',
+					reason: 'rag-initializing-rules-temporary',
+					confidence: 'medium',
+					offline: true
+				};
+			} else {
+				console.log('📋 RAG unavailable, using rule-based system (offline)');
+				this.stats.modelSelectionReasons['rule-based-local']++;
+				return {
+					model: 'rule-based-local',
+					reason: 'offline-rules-only',
+					confidence: 'medium',
+					offline: true
+				};
 			}
 		}
 
-		// FIXED: Default strategy - prefer Gemini when online
-		if (this.isOnline && systemStatus.models.gemini.available) {
-			console.log('🌐 Online - defaulting to Gemini');
-			this.stats.modelSelectionReasons['gemini-preferred']++;
-			return { model: 'gemini', reason: 'online-gemini-preferred', confidence: 'high' };
-		}
-
-		// Offline fallback strategy
-		if (systemStatus.models.clinicalRAG.available) {
-			this.stats.modelSelectionReasons['clinical-rag']++;
-			return { model: 'clinical-rag', reason: 'offline-rag-priority', confidence: 'medium' };
-		} else {
-			this.stats.modelSelectionReasons['rule-based-local']++;
-			return { model: 'rule-based-local', reason: 'offline-rules-only', confidence: 'medium' };
-		}
+		// Fallback - should not reach here normally
+		console.warn('⚠️ Unexpected condition in model selection, defaulting to rule-based');
+		this.stats.modelSelectionReasons['rule-based-local']++;
+		return { model: 'rule-based-local', reason: 'unexpected-fallback', confidence: 'low' };
 	}
 
-	// FIXED: Clinical context analysis with better thresholds
-	analyzeClinicalContextFixed(query, patientData) {
+	analyzeClinicalContext(query, patientData) {
 		const allText = `${query} ${patientData?.symptoms || ''} ${patientData?.chiefComplaint || ''}`.toLowerCase();
 
 		// Emergency detection
@@ -324,7 +353,7 @@ class EnhancedHybridManager {
 			allText.includes('chest pain')
 		);
 
-		// FIXED: Simple query detection
+		// Simple query detection
 		const isSimple = (
 			query.length < HYBRID_CONFIG.simpleQueryMaxLength &&
 			!patientData?.medicalHistory &&
@@ -332,7 +361,7 @@ class EnhancedHybridManager {
 			(!patientData?.symptoms || patientData.symptoms.length < 100)
 		);
 
-		// FIXED: Complex detection with higher threshold
+		// Complex detection with higher threshold
 		const isComplex = !isSimple && (
 			query.length > HYBRID_CONFIG.complexQueryMinLength ||
 			patientData?.medicalHistory?.length > 200 ||
@@ -354,19 +383,19 @@ class EnhancedHybridManager {
 		};
 	}
 
-	// Continue with existing methods...
 	async executeWithFallback(selection, query, patientData, guidelines, options) {
 		const models = [selection.model];
 
-		// Add fallback models if enabled
+		// FIXED: Better fallback chain that considers offline RAG
 		if (HYBRID_CONFIG.enableFallbackChain && selection.model !== 'rule-based-local') {
-			// FIXED: Better fallback chain
 			if (selection.model === 'gemini') {
+				// If Gemini fails, try RAG first, then rules
 				if (await this.getSystemStatus().then(s => s.models.clinicalRAG.available)) {
 					models.push('clinical-rag');
 				}
 				models.push('rule-based-local');
 			} else if (selection.model === 'clinical-rag') {
+				// If RAG fails, try Gemini if online, otherwise rules
 				if (this.isOnline && await this.getSystemStatus().then(s => s.models.gemini.available)) {
 					models.push('gemini');
 				}
@@ -402,14 +431,20 @@ class EnhancedHybridManager {
 				return { ...localResult, method: 'rule-based-local-ai' };
 
 			case 'clinical-rag':
+				console.log('📚 Executing Clinical RAG system...');
 				const ragResult = await getClinicalRAGRecommendations(query, patientData, options);
 				this.stats.ragQueries++;
-				return { ...ragResult, method: 'clinical-rag-system' };
+				return {
+					...ragResult,
+					method: 'clinical-rag-system',
+					offline: !this.isOnline  // Flag offline usage
+				};
 
 			case 'gemini':
+				console.log('🌐 Executing Gemini API...');
 				const geminiResult = await getGeminiRecommendations(query, patientData, { guidelines });
 				this.stats.geminiQueries++;
-				return { ...geminiResult, method: 'google-gemini' };
+				return { ...geminiResult, method: 'google-gemini-multi-model' };
 
 			default:
 				throw new Error(`Unknown model: ${modelName}`);
@@ -417,9 +452,29 @@ class EnhancedHybridManager {
 	}
 
 	async executeEmergencyFallback(query, patientData, guidelines, originalError) {
-		console.log('🆘 Executing emergency fallback to rule-based AI...');
+		console.log('🆘 Executing emergency fallback...');
 
+		// FIXED: Try RAG first in emergency fallback if available
+		if (this.ragInitialized) {
+			try {
+				console.log('🏥 Trying RAG system as emergency fallback...');
+				const ragResult = await getClinicalRAGRecommendations(query, patientData);
+				this.stats.ragQueries++;
+				return {
+					...ragResult,
+					selectedModel: 'clinical-rag-emergency',
+					selectionReason: 'emergency-rag-fallback',
+					originalError: originalError.message,
+					method: 'clinical-rag-emergency'
+				};
+			} catch (ragError) {
+				console.warn('RAG emergency fallback failed:', ragError);
+			}
+		}
+
+		// Final fallback to rule-based
 		try {
+			console.log('📋 Using rule-based emergency fallback...');
 			const result = await getPracticalLocalRecommendations(query, patientData);
 			return {
 				...result,
@@ -435,29 +490,28 @@ class EnhancedHybridManager {
 
 All AI systems are temporarily unavailable. Please follow basic clinical principles:
 
-**For Headache Assessment:**
-• Check vital signs including blood pressure
-• Assess for danger signs (severe headache, fever, neck stiffness, altered consciousness)
-• Consider common causes: tension headache, migraine, sinusitis
-• Rule out secondary causes if red flags present
+**For General Assessment:**
+• Check vital signs and patient stability
+• Assess for danger signs requiring immediate attention
+• Follow systematic approach: history, examination, assessment, plan
 
-**Immediate Management:**
-• Paracetamol 500-1000mg for symptom relief
-• Assess and treat underlying causes
-• Consider referral if severe or concerning features
+**Basic Management:**
+• Ensure patient safety and comfort
+• Provide symptomatic relief as appropriate
+• Use evidence-based clinical guidelines
 
 **When to Refer:**
-• Sudden severe headache ("thunderclap")
-• Headache with fever and neck stiffness
-• New headache with neurological signs
-• Progressive worsening headache
+• Any unstable vital signs
+• Severe or worsening symptoms
+• Uncertainty about diagnosis or management
+• Patient or family concerns
 
 Please refer to available clinical guidelines and use your professional judgment.`,
 				selectedModel: 'basic-emergency-protocol',
 				selectionReason: 'all-systems-failed',
 				confidence: 'low',
 				method: 'emergency-protocol',
-				offline: true,
+				offline: !this.isOnline,
 				allSystemsFailed: true
 			};
 		}
@@ -472,17 +526,26 @@ Please refer to available clinical guidelines and use your professional judgment
 			hybridCapable: true,
 			systemStatus: {
 				ruleBasedLocal: getPracticalLocalStatus(),
-				clinicalRAG: { available: this.ragInitialized },
-				gemini: { available: this.isOnline && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY },
+				clinicalRAG: {
+					available: this.ragInitialized,
+					initialized: this.ragInitialized,
+					offlineCapable: true
+				},
+				gemini: {
+					available: this.isOnline && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+					...getModelStatus()
+				},
 				online: this.isOnline,
-				hybridVersion: 'fixed-v1-gemini-first'
+				hybridVersion: 'enhanced-v3-offline-rag-priority'
 			},
 			responseTime: performance.now() - startTime,
 			guidelines: guidelines.slice(0, 3).map(g => ({
 				title: g.title,
 				category: g.category
 			})),
-			timestamp: new Date()
+			timestamp: new Date(),
+			offline: !this.isOnline,
+			ragUsed: selection.model === 'clinical-rag'
 		};
 	}
 
@@ -492,7 +555,8 @@ Please refer to available clinical guidelines and use your professional judgment
 			reason: selection.reason,
 			timestamp: new Date(),
 			responseTime: result.responseTime,
-			confidence: result.confidence
+			confidence: result.confidence,
+			offline: selection.offline || !this.isOnline
 		};
 
 		this.stats.averageResponseTime =
@@ -500,7 +564,6 @@ Please refer to available clinical guidelines and use your professional judgment
 			this.stats.totalQueries;
 	}
 
-	// FIXED: Proper RAG status handling without undefined getStatus
 	async getSystemStatus() {
 		let ragStatus = {
 			available: this.ragInitialized,
@@ -508,10 +571,11 @@ Please refer to available clinical guidelines and use your professional judgment
 			initialized: this.ragInitialized,
 			documentCount: 0,
 			guidelineCount: 0,
-			embeddingBased: false
+			embeddingBased: false,
+			offlineCapable: this.ragInitialized
 		};
 
-		// FIXED: Try to get more detailed status if RAG system instance is available
+		// Get detailed RAG status if available
 		if (this.ragSystemInstance && typeof this.ragSystemInstance.getStatus === 'function') {
 			try {
 				const detailedStatus = this.ragSystemInstance.getStatus();
@@ -519,46 +583,33 @@ Please refer to available clinical guidelines and use your professional judgment
 					...ragStatus,
 					...detailedStatus,
 					available: detailedStatus.initialized || detailedStatus.available || this.ragInitialized,
-					embeddingBased: true
+					embeddingBased: true,
+					offlineCapable: true
 				};
-				console.log('📊 Got detailed RAG status:', detailedStatus);
 			} catch (error) {
 				console.warn('Could not get detailed RAG status:', error);
 			}
-		} else if (this.ragSystemInstance && this.ragInitialized) {
-			// Try to get basic info from semantic RAG if available
-			try {
-				if (this.ragSystemInstance.semanticRAG) {
-					ragStatus = {
-						...ragStatus,
-						available: true,
-						initialized: true,
-						documentCount: this.ragSystemInstance.semanticRAG.documents?.length || 21,
-						guidelineCount: this.ragSystemInstance.semanticRAG.documents?.length || 21,
-						embeddingBased: true,
-						embeddingsInitialized: this.ragSystemInstance.semanticRAG.isInitialized
-					};
-				}
-			} catch (error) {
-				console.warn('Could not get semantic RAG info:', error);
-			}
 		} else if (this.ragInitialized) {
-			// If RAG is initialized but we don't have the instance, provide basic status
 			ragStatus = {
 				...ragStatus,
 				available: true,
 				initialized: true,
-				documentCount: 21, // Known from initialization logs
+				documentCount: 21,
 				guidelineCount: 21,
-				embeddingBased: true // Assume embeddings since we're using the new system
+				embeddingBased: true,
+				offlineCapable: true
 			};
 		}
+
+		// Get Gemini model status
+		const geminiModelStatus = getModelStatus();
 
 		return {
 			hybrid: {
 				enabled: true,
-				version: 'fixed-v2-real-embeddings',
+				version: 'enhanced-v3-offline-rag-priority',
 				prioritizeGeminiWhenOnline: HYBRID_CONFIG.prioritizeGeminiWhenOnline,
+				prioritizeRAGWhenOffline: HYBRID_CONFIG.prioritizeRAGWhenOffline,
 				ragEnabled: HYBRID_CONFIG.enableRAG,
 				embeddingsEnabled: true
 			},
@@ -568,6 +619,7 @@ Please refer to available clinical guidelines and use your professional judgment
 					name: 'ATLAS-Rule-Based-AI',
 					type: 'rule-based',
 					dependencies: 'none',
+					offlineCapable: true,
 					...getPracticalLocalStatus()
 				},
 				clinicalRAG: {
@@ -579,36 +631,19 @@ Please refer to available clinical guidelines and use your professional judgment
 					initialized: ragStatus.initialized,
 					embeddingBased: ragStatus.embeddingBased,
 					embeddingModel: ragStatus.embeddingBased ? 'Xenova/all-MiniLM-L6-v2' : 'fallback',
+					offlineCapable: true,
+					priorityWhenOffline: true,  // NEW: Flag to indicate priority offline
 					...ragStatus
 				},
 				gemini: {
-					available: (() => {
-						const hasKey = !!process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-						const keyLength = process.env.NEXT_PUBLIC_GEMINI_API_KEY?.length || 0;
-
-						// 🔍 DEBUG: Log what's actually happening at runtime
-						console.log('🔍 GEMINI RUNTIME CHECK:', {
-							hasKey,
-							keyLength,
-							keyType: typeof process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-							isOnline: this.isOnline,
-							finalAvailable: hasKey && this.isOnline
-						});
-
-						// 🚀 TEMPORARY FIX: Force availability when online to test Gemini
-						if (this.isOnline && !hasKey) {
-							console.log('⚠️ API key missing at runtime, but was present at build time!');
-							console.log('🚀 FORCING Gemini availability for testing...');
-							return true; // Force true to test Gemini integration
-						}
-
-						return hasKey && this.isOnline;
-					})(),
-					name: 'gemini-2.5-flash',
+					available: this.isOnline && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY &&
+						geminiModelStatus.availableModels.length > 0,
+					name: 'gemini-multi-model',
 					type: 'api',
 					requiresNetwork: true,
 					priority: this.isOnline ? 'high' : 'unavailable',
-					debugForced: this.isOnline && !process.env.NEXT_PUBLIC_GEMINI_API_KEY // Flag when forced
+					offlineCapable: false,
+					...geminiModelStatus
 				}
 			},
 			stats: this.stats,
@@ -616,7 +651,8 @@ Please refer to available clinical guidelines and use your professional judgment
 			lastSelection: this.lastSelection,
 			ragInitialized: this.ragInitialized,
 			ragInitializing: this.ragInitializing,
-			embeddingsSupported: true
+			embeddingsSupported: true,
+			offlineMode: !this.isOnline
 		};
 	}
 }
