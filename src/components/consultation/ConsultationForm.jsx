@@ -1,4 +1,4 @@
-// src/components/consultation/ConsultationForm.jsx - DYNAMIC RESPONSIVE DESIGN
+// src/components/consultation/ConsultationForm.jsx - UPDATED WITH CENTRALIZED ONLINE STATUS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,13 +6,15 @@ import { useForm } from 'react-hook-form';
 import { getRelevantGuidelines } from '../../lib/db/expandedGuidelines';
 import { getById as getPatientById } from '../../lib/db/patients';
 import { consultationDb } from '../../lib/db';
+import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
+import { useUserSystem } from '../../lib/auth/simpleUserSystem';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { TextArea } from '../ui/TextArea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Badge } from '../ui/Badge';
-import { useUserSystem } from '../../lib/auth/simpleUserSystem';
+import ConnectionStatus from '../ui/ConnectionStatus'; // 🎯 REUSABLE COMPONENT
 
 // Simple SMART Guidelines integration for normal form
 let SMARTGuidelinesEngine;
@@ -29,13 +31,16 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 	const [patientLoading, setPatientLoading] = useState(true);
 	const [relevantGuidelines, setRelevantGuidelines] = useState([]);
 	const [smartGuidelines, setSmartGuidelines] = useState(null);
-	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 	const [guidelinesLoading, setGuidelinesLoading] = useState(false);
 	const [formExpanded, setFormExpanded] = useState(false);
 
 	const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm();
 
 	const { currentUser, hasPermission } = useUserSystem();
+
+	// 🎯 USE CENTRALIZED ONLINE STATUS
+	const { isOnline, getStatusInfo } = useOnlineStatus();
+	const statusInfo = getStatusInfo();
 
 	// Watch key fields for guideline suggestions
 	const symptoms = watch('symptoms', '');
@@ -182,7 +187,11 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 				formType: formExpanded ? 'standard-expanded' : 'standard',
 				formMode: formExpanded ? 'comprehensive' : 'quick',
 				tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : [],
-				isOnline: isOnline
+
+				// 🎯 USE CENTRALIZED ONLINE STATUS
+				isOnline: isOnline,
+				connectionType: statusInfo.connectionType,
+				isSlowConnection: statusInfo.isSlowConnection
 			};
 
 			await consultationDb.add(consultationData);
@@ -200,18 +209,6 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 			setLoading(false);
 		}
 	};
-
-	useEffect(() => {
-		const handleOnlineStatus = () => setIsOnline(navigator.onLine);
-
-		window.addEventListener('online', handleOnlineStatus);
-		window.addEventListener('offline', handleOnlineStatus);
-
-		return () => {
-			window.removeEventListener('online', handleOnlineStatus);
-			window.removeEventListener('offline', handleOnlineStatus);
-		};
-	}, []);
 
 	if (patientLoading) {
 		return (
@@ -268,6 +265,10 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 				{/* DYNAMIC: Responsive container that adapts to form complexity */}
 				<div className={`w-full mx-auto px-4 sm:px-6 transition-all duration-300 ${formExpanded ? 'max-w-6xl' : 'max-w-4xl'
 					}`}>
+
+					{/* 🎯 CONNECTION STATUS BANNER */}
+					<ConnectionStatus variant="banner" showLastCheck={true} className="mb-6" />
+
 					{/* Header */}
 					<div className="text-center mb-6 sm:mb-8">
 						<h1 className={`font-bold text-gray-900 mb-2 transition-all duration-300 ${formExpanded ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'
@@ -278,11 +279,9 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 							Patient: {patient?.name} (ID: {patient?.id}) | Age: {patient?.age} | Gender: {patient?.gender}
 						</p>
 
-						{/* Dynamic badge layout */}
+						{/* 🎯 ENHANCED DYNAMIC BADGE LAYOUT */}
 						<div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-4">
-							<Badge variant={isOnline ? "success" : "warning"} size="sm">
-								{isOnline ? "🟢 Online" : "🟡 Offline"}
-							</Badge>
+							<ConnectionStatus variant="compact" />
 							<Badge variant={formExpanded ? "primary" : "secondary"} size="sm">
 								{formExpanded ? "📋 Comprehensive Form" : "📝 Standard Form"}
 							</Badge>
@@ -291,6 +290,9 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 							)}
 							{guidelinesLoading && (
 								<Badge variant="warning" size="sm">⏳ Loading Guidelines...</Badge>
+							)}
+							{statusInfo.isSlowConnection && (
+								<Badge variant="warning" size="sm">🐌 Slow Connection</Badge>
 							)}
 						</div>
 
@@ -305,7 +307,7 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 										: 'text-gray-600 hover:text-gray-900'
 										}`}
 								>
-									Quick Form
+									Quick Form {statusInfo.isSlowConnection && '(Recommended)'}
 								</button>
 								<button
 									type="button"
@@ -315,7 +317,7 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 										: 'text-gray-600 hover:text-gray-900'
 										}`}
 								>
-									Comprehensive
+									Comprehensive {!isOnline && '(Limited offline)'}
 								</button>
 							</div>
 						</div>
@@ -379,6 +381,12 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 											<Badge variant="outline" size="sm">
 												{formExpanded ? 'Comprehensive Mode' : 'Quick Mode'}
 											</Badge>
+											{!isOnline && (
+												<Badge variant="warning" size="sm">Offline</Badge>
+											)}
+											{statusInfo.isSlowConnection && (
+												<Badge variant="warning" size="sm">Slow</Badge>
+											)}
 										</div>
 									</div>
 								</CardHeader>
@@ -539,7 +547,7 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 								</CardContent>
 							</Card>
 
-							{/* Dynamic button layout */}
+							{/* 🎯 ENHANCED DYNAMIC BUTTON LAYOUT WITH CONNECTION AWARENESS */}
 							<div className="flex flex-col sm:flex-row justify-between items-center gap-4">
 								<div className="flex space-x-4">
 									<Button
@@ -554,7 +562,7 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 								</div>
 
 								<div className="flex flex-col sm:flex-row items-center gap-4">
-									{/* Form stats */}
+									{/* 🎯 ENHANCED FORM STATS WITH CONNECTION INFO */}
 									<div className="flex items-center space-x-4 text-sm text-gray-600">
 										{relevantGuidelines.length > 0 && (
 											<span className="flex items-center">
@@ -566,6 +574,18 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 											<span className="mr-1">📋</span>
 											{formExpanded ? 'Comprehensive' : 'Quick'} mode
 										</span>
+										{!isOnline && (
+											<span className="flex items-center text-amber-600">
+												<span className="mr-1">💾</span>
+												Saving locally
+											</span>
+										)}
+										{statusInfo.isSlowConnection && (
+											<span className="flex items-center text-yellow-600">
+												<span className="mr-1">🐌</span>
+												Slow connection
+											</span>
+										)}
 									</div>
 
 									<Button
@@ -576,7 +596,10 @@ export default function ConsultationForm({ patientId, onConsultationComplete }) 
 										className="w-full sm:w-auto"
 										size={formExpanded ? "lg" : "md"}
 									>
-										{loading ? 'Saving...' : `Save ${formExpanded ? 'Comprehensive' : 'Standard'} Consultation`}
+										{loading ? 'Saving...' :
+											!isOnline ? `Save ${formExpanded ? 'Comprehensive' : 'Standard'} Consultation (Offline)` :
+												`Save ${formExpanded ? 'Comprehensive' : 'Standard'} Consultation`
+										}
 									</Button>
 								</div>
 							</div>

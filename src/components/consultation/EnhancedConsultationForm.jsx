@@ -1,4 +1,4 @@
-// src/components/consultation/EnhancedConsultationForm.jsx - IMPROVED SCROLLABLE AI PANEL
+// src/components/consultation/EnhancedConsultationForm.jsx - UPDATED WITH CENTRALIZED ONLINE STATUS
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,18 +8,23 @@ import { AIAnalysisDisplay } from '../ui/AIAnalysisDisplay';
 import { CONFIDENCE_LEVELS } from '../../lib/constants/clinicalConstants.js';
 import { getRelevantGuidelines, seedExpandedGuidelines } from '../../lib/db/expandedGuidelines';
 import { patientDb, consultationDb, medicalDb } from '../../lib/db';
+import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { TextArea } from '../ui/TextArea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Badge } from '../ui/Badge';
+import ConnectionStatus from '../ui/ConnectionStatus'; // 🎯 REUSABLE COMPONENT
 
 export default function EnhancedConsultationForm({ patientId, onConsultationComplete }) {
 	const [patient, setPatient] = useState(null);
 	const [loading, setLoading] = useState(false);
 	const [patientLoading, setPatientLoading] = useState(true);
-	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+	// 🎯 USE CENTRALIZED ONLINE STATUS
+	const { isOnline, getStatusInfo } = useOnlineStatus();
+	const statusInfo = getStatusInfo();
 
 	// AI Analysis States
 	const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -131,7 +136,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	// Watch all form fields
 	const watchedFields = watch();
 
-	// System status monitoring
+	// 🎯 SYSTEM STATUS MONITORING WITH CONNECTION AWARENESS
 	const updateSystemStatus = useCallback(async () => {
 		try {
 			const status = await getEnhancedSystemStatus();
@@ -141,20 +146,22 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				ragAvailable: status.models?.clinicalRAG?.available,
 				ragGuidelineCount: status.models?.clinicalRAG?.guidelineCount,
 				geminiAvailable: status.models?.gemini?.available,
-				hybridEnabled: status.hybrid?.enabled
+				hybridEnabled: status.hybrid?.enabled,
+				connectionStatus: statusInfo.statusText
 			});
 		} catch (error) {
 			console.warn('Could not get system status:', error);
+			// Fallback status with connection-aware defaults
 			setSystemStatus({
 				models: {
 					localAI: { available: true },
 					clinicalRAG: { available: true, guidelineCount: 15 },
-					gemini: { available: false }
+					gemini: { available: isOnline } // Only available when online
 				},
 				hybrid: { enabled: true }
 			});
 		}
-	}, [isOnline]);
+	}, [isOnline, statusInfo]);
 
 	useEffect(() => {
 		updateSystemStatus();
@@ -191,9 +198,15 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 		loadPatientData();
 	}, [patientId, setValue]);
 
-	// Enhanced real-time clinical analysis
+	// 🎯 ENHANCED REAL-TIME CLINICAL ANALYSIS WITH CONNECTION AWARENESS
 	const performRealTimeAnalysis = useCallback(async (formData) => {
 		if (!formData.chiefComplaint && !formData.symptoms && !formData.presentingComplaint) {
+			return;
+		}
+
+		// Don't start analysis if offline and no local capabilities
+		if (!isOnline && !systemStatus.models?.clinicalRAG?.available) {
+			console.log('Skipping AI analysis - offline and no local capabilities');
 			return;
 		}
 
@@ -232,6 +245,16 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 
 			setAnalysisProgress(80);
 
+			// 🎯 CONNECTION-AWARE AI OPTIONS
+			const analysisOptions = {
+				modelPreference: !isOnline ? 'local-only' :
+					statusInfo.isSlowConnection ? 'prefer-local' : modelPreference,
+				maxRetries: statusInfo.isSlowConnection ? 1 : 2,
+				fallbackToRules: true,
+				fullContent: true,
+				timeoutMs: statusInfo.isSlowConnection ? 30000 : 10000 // Longer timeout for slow connections
+			};
+
 			// Get enhanced clinical recommendations
 			const response = await getEnhancedClinicalRecommendations(
 				clinicalQuery,
@@ -249,12 +272,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 					emergencyIndicators: newFlags.dangerSigns || newFlags.emergencyIndicators
 				},
 				{ guidelines },
-				{
-					modelPreference,
-					maxRetries: 2,
-					fallbackToRules: true,
-					fullContent: true
-				}
+				analysisOptions
 			);
 
 			updateModelStats(response.selectedModel, response.responseTime);
@@ -265,6 +283,8 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				...response,
 				timestamp: new Date(),
 				isOffline: !isOnline,
+				connectionType: statusInfo.connectionType,
+				isSlowConnection: statusInfo.isSlowConnection,
 				clinicalFlags: newFlags,
 				guidelinesUsed: guidelines.length,
 				systemStatus: await getEnhancedSystemStatus()
@@ -272,15 +292,26 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 
 		} catch (error) {
 			console.error('Analysis failed:', error);
-			setApiError(`Analysis failed: ${error.message}`);
+
+			// 🎯 CONNECTION-AWARE ERROR MESSAGES
+			let errorMessage = `Analysis failed: ${error.message}`;
+			if (!isOnline) {
+				errorMessage += '\n\nWorking offline - only local guidelines and rules available.';
+			} else if (statusInfo.isSlowConnection) {
+				errorMessage += '\n\nSlow connection detected - try the Standard form for better performance.';
+			}
+
+			setApiError(errorMessage);
 
 			setAiAnalysis({
-				text: `Analysis temporarily unavailable: ${error.message}\n\nPlease refer to clinical guidelines manually and use your professional judgment.`,
+				text: `${errorMessage}\n\nPlease refer to clinical guidelines manually and use your professional judgment.`,
 				timestamp: new Date(),
 				confidence: CONFIDENCE_LEVELS.VERY_LOW,
 				selectedModel: 'error-fallback',
 				isError: true,
-				isOffline: !isOnline
+				isOffline: !isOnline,
+				connectionType: statusInfo.connectionType,
+				isSlowConnection: statusInfo.isSlowConnection
 			});
 		} finally {
 			setTimeout(() => {
@@ -288,7 +319,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				setAnalysisProgress(0);
 			}, 500);
 		}
-	}, [patient, isOnline, modelPreference]);
+	}, [patient, isOnline, statusInfo, modelPreference, systemStatus]);
 
 	// Helper functions for clinical assessment
 	const detectDangerSigns = (formData) => {
@@ -324,6 +355,10 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	const constructComprehensiveQuery = (formData, patient) => {
 		let query = `COMPREHENSIVE CLINICAL ASSESSMENT
 
+CONNECTION STATUS: ${statusInfo.statusText}
+${!isOnline ? 'OFFLINE MODE - Using local guidelines and rules only' : ''}
+${statusInfo.isSlowConnection ? 'SLOW CONNECTION - Prioritize essential recommendations' : ''}
+
 PATIENT PROFILE:
 - Age: ${patient?.age || 'Unknown'} years
 - Gender: ${patient?.gender || 'Not specified'}
@@ -353,7 +388,7 @@ CLINICAL CONTEXT:
 - Allergies: ${formData.allergies || 'NKDA'}
 - Risk Factors: ${formData.riskFactors || 'Not assessed'}
 
-Please provide comprehensive clinical analysis including:
+Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clinical analysis including:
 1. Clinical Assessment and Differential Diagnosis
 2. WHO Guideline-based Management Recommendations  
 3. Medication Dosages and Administration
@@ -406,18 +441,21 @@ Please provide comprehensive clinical analysis including:
 		{ id: 'advanced', label: 'Advanced', icon: '🎯' }
 	];
 
-	// Debounced analysis trigger
+	// Debounced analysis trigger with connection awareness
 	useEffect(() => {
 		const hasData = watchedFields.chiefComplaint || watchedFields.symptoms || watchedFields.presentingComplaint;
 
 		if (hasData) {
+			// Longer delay for slow connections to avoid overloading
+			const delay = statusInfo.isSlowConnection ? 5000 : 3000;
+
 			const timeoutId = setTimeout(() => {
 				performRealTimeAnalysis(watchedFields);
-			}, 3000);
+			}, delay);
 
 			return () => clearTimeout(timeoutId);
 		}
-	}, [watchedFields.chiefComplaint, watchedFields.symptoms, watchedFields.presentingComplaint, watchedFields.generalAppearance, performRealTimeAnalysis]);
+	}, [watchedFields.chiefComplaint, watchedFields.symptoms, watchedFields.presentingComplaint, watchedFields.generalAppearance, performRealTimeAnalysis, statusInfo.isSlowConnection]);
 
 	// Form submission
 	const onSubmit = useCallback(async (data) => {
@@ -479,6 +517,12 @@ Please provide comprehensive clinical analysis including:
 				clinicalFlags: clinicalFlags,
 				relevantGuidelinesUsed: relevantGuidelines?.map(g => g.id) || [],
 
+				// 🎯 CONNECTION METADATA
+				isOnline: isOnline,
+				connectionType: statusInfo.connectionType,
+				isSlowConnection: statusInfo.isSlowConnection,
+				connectionStatusAtSave: statusInfo.statusText,
+
 				// Metadata
 				formType: 'enhanced-clinical-comprehensive',
 				tags: data.symptoms ? data.symptoms.split(',').map(s => s.trim().toLowerCase()) : [],
@@ -502,7 +546,7 @@ Please provide comprehensive clinical analysis including:
 		} finally {
 			setLoading(false);
 		}
-	}, [patient, consultationId, aiAnalysis, relevantGuidelines, clinicalFlags, onConsultationComplete, modelStats]);
+	}, [patient, consultationId, aiAnalysis, relevantGuidelines, clinicalFlags, onConsultationComplete, modelStats, isOnline, statusInfo]);
 
 	// Loading states
 	if (patientLoading) {
@@ -539,13 +583,22 @@ Please provide comprehensive clinical analysis including:
 		);
 	}
 
-	// Clinical section rendering function
+	// Clinical section rendering function (same as before, but with connection-aware hints)
 	const renderClinicalSection = () => {
 		switch (activeSection) {
 			case 'presenting-complaint':
 				return (
 					<div className="space-y-6">
-						<h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Presenting Complaint</h3>
+						<h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+							Presenting Complaint
+							{/* 🎯 CONNECTION-AWARE HINTS */}
+							{!isOnline && (
+								<span className="text-sm font-normal text-amber-600 ml-2">(Offline - AI limited)</span>
+							)}
+							{statusInfo.isSlowConnection && (
+								<span className="text-sm font-normal text-yellow-600 ml-2">(AI may be slower)</span>
+							)}
+						</h3>
 
 						<Input
 							label="Chief Complaint"
@@ -887,15 +940,18 @@ Please provide comprehensive clinical analysis including:
 		<div className="atlas-backdrop">
 			<div className="min-h-screen py-4 sm:py-8">
 				<div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+
+					{/* 🎯 CONNECTION STATUS BANNER */}
+					<ConnectionStatus variant="banner" showLastCheck={true} className="mb-6" />
+
 					{/* Header */}
 					<div className="text-center mb-6">
 						<h1 className="text-2xl font-bold text-gray-900">Comprehensive Clinical Consultation</h1>
 						<p className="text-gray-600">Patient: {patient.name} (ID: {patient.id}) | Age: {patient.age} | Gender: {patient.gender}</p>
 
+						{/* 🎯 ENHANCED STATUS DISPLAY */}
 						<div className="flex flex-wrap justify-center gap-2 mt-2">
-							<Badge variant={isOnline ? "success" : "warning"} size="sm">
-								{isOnline ? "🟢 Online" : "🟡 Offline"}
-							</Badge>
+							<ConnectionStatus variant="compact" />
 							<Badge variant="primary" size="sm">⚕️ Comprehensive Assessment</Badge>
 							{systemStatus.models?.clinicalRAG?.available && (
 								<Badge variant="info" size="sm">📚 RAG Ready ({systemStatus.models.clinicalRAG.guidelineCount} guidelines)</Badge>
@@ -905,6 +961,9 @@ Please provide comprehensive clinical analysis including:
 							)}
 							{clinicalFlags.emergencyIndicators && (
 								<Badge variant="error" size="sm">🚨 Emergency Priority</Badge>
+							)}
+							{statusInfo.isSlowConnection && (
+								<Badge variant="warning" size="sm">🐌 Slow Connection</Badge>
 							)}
 						</div>
 					</div>
@@ -960,10 +1019,19 @@ Please provide comprehensive clinical analysis including:
 										</Button>
 									</div>
 
+									{/* 🎯 ENHANCED STATS WITH CONNECTION INFO */}
 									<div className="flex flex-col sm:flex-row items-center space-x-0 sm:space-x-4 space-y-2 sm:space-y-0">
-										<Badge variant="info" size="sm">
-											📊 {modelStats.totalQueries} AI queries used
-										</Badge>
+										<div className="flex items-center space-x-3 text-sm text-gray-600">
+											<Badge variant="info" size="sm">
+												📊 {modelStats.totalQueries} AI queries used
+											</Badge>
+											{!isOnline && (
+												<Badge variant="warning" size="sm">💾 Saving locally</Badge>
+											)}
+											{statusInfo.isSlowConnection && (
+												<Badge variant="warning" size="sm">🐌 Slow connection</Badge>
+											)}
+										</div>
 
 										<Button
 											type="submit"
@@ -973,21 +1041,24 @@ Please provide comprehensive clinical analysis including:
 											size="lg"
 											className="w-full sm:w-auto"
 										>
-											Save Comprehensive Consultation
+											{loading ? 'Saving...' :
+												!isOnline ? 'Save Comprehensive Consultation (Offline)' :
+													'Save Comprehensive Consultation'
+											}
 										</Button>
 									</div>
 								</div>
 							</form>
 						</div>
 
-						{/* 🎯 FIXED SCROLLABLE AI ANALYSIS PANEL - Sidebar on the right */}
+						{/* 🎯 ENHANCED AI ANALYSIS PANEL WITH CONNECTION AWARENESS */}
 						{(isAnalyzing || aiAnalysis) && (
 							<div className="lg:col-span-1">
 								<div className="sticky top-6">
 									<div
 										className="atlas-card-primary border border-gray-200 rounded-lg shadow-sm bg-white"
 										style={{
-											maxHeight: 'calc(100vh - 34rem)', // Maximum height limit
+											maxHeight: 'calc(100vh - 34rem)',
 											display: 'flex',
 											flexDirection: 'column'
 										}}
@@ -995,9 +1066,12 @@ Please provide comprehensive clinical analysis including:
 										{/* Header - Fixed height, won't scroll */}
 										<div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
 											<div className="flex flex-col space-y-2">
-												<h2 className="text-lg font-semibold text-gray-900">
-													Clinical Decision Support
-												</h2>
+												<div className="flex justify-between items-start">
+													<h2 className="text-lg font-semibold text-gray-900">
+														Clinical Decision Support
+													</h2>
+													<ConnectionStatus variant="icon-only" />
+												</div>
 												{isAnalyzing && (
 													<div className="flex items-center space-x-2">
 														<LoadingSpinner size="sm" />
@@ -1031,18 +1105,24 @@ Please provide comprehensive clinical analysis including:
 																📋 {aiAnalysis.guidelinesUsed} Guidelines
 															</Badge>
 														)}
+														{aiAnalysis.isOffline && (
+															<Badge variant="warning" size="sm">⚠️ Offline</Badge>
+														)}
+														{aiAnalysis.isSlowConnection && (
+															<Badge variant="warning" size="sm">🐌 Slow</Badge>
+														)}
 													</div>
 												)}
 											</div>
 										</div>
 
-										{/* SCROLLABLE CONTENT AREA - Flexible height that matches content */}
+										{/* SCROLLABLE CONTENT AREA */}
 										<div
 											className="overflow-y-auto p-4"
 											style={{
-												flex: '1 1 0%',                      // Take remaining space
-												minHeight: '200px',                 // Minimum for usability
-												maxHeight: 'calc(100vh - 10rem)',   // Max height with header space
+												flex: '1 1 0%',
+												minHeight: '200px',
+												maxHeight: 'calc(100vh - 10rem)',
 												overflowWrap: 'break-word',
 												wordBreak: 'break-word',
 												scrollbarWidth: 'thin',
@@ -1051,6 +1131,28 @@ Please provide comprehensive clinical analysis including:
 										>
 											{aiAnalysis && (
 												<div className="space-y-4">
+													{/* Connection Status Alert */}
+													{(aiAnalysis.isOffline || aiAnalysis.isSlowConnection) && (
+														<div className={`p-3 rounded-lg border text-sm ${aiAnalysis.isOffline ? 'bg-amber-50 border-amber-200 text-amber-800' :
+																'bg-yellow-50 border-yellow-200 text-yellow-800'
+															}`}>
+															<div className="flex items-center">
+																<span className="mr-2">
+																	{aiAnalysis.isOffline ? '⚠️' : '🐌'}
+																</span>
+																<span className="font-medium">
+																	{aiAnalysis.isOffline ? 'Offline Analysis' : 'Slow Connection'}
+																</span>
+															</div>
+															<p className="text-xs mt-1">
+																{aiAnalysis.isOffline
+																	? 'Using local guidelines and rules only'
+																	: 'Analysis may be slower than usual'
+																}
+															</p>
+														</div>
+													)}
+
 													{/* AI Analysis Content - Main text response */}
 													<div className="prose prose-sm max-w-none">
 														<div
@@ -1111,6 +1213,10 @@ Please provide comprehensive clinical analysis including:
 																<span className="text-right font-mono">{aiAnalysis.selectedModel || 'Unknown'}</span>
 															</div>
 															<div className="flex justify-between items-center">
+																<span>Connection:</span>
+																<span className="text-right">{aiAnalysis.connectionType || statusInfo.statusText}</span>
+															</div>
+															<div className="flex justify-between items-center">
 																<span>Confidence:</span>
 																<Badge
 																	variant={
@@ -1162,33 +1268,46 @@ Please provide comprehensive clinical analysis including:
 												</div>
 											)}
 
-											{/* Error State */}
+											{/* Error State with Connection Context */}
 											{apiError && (
 												<div className="p-3 bg-red-50 border border-red-200 rounded-lg">
 													<div className="flex items-center mb-2">
 														<span className="text-red-600 mr-2">⚠️</span>
 														<span className="font-medium text-red-800 text-sm">Analysis Error</span>
 													</div>
-													<p className="text-sm text-red-700 mb-3 break-words">{apiError}</p>
-													<Button
-														variant="secondary"
-														size="sm"
-														onClick={() => performRealTimeAnalysis(watchedFields)}
-														disabled={isAnalyzing}
-														className="w-full"
-													>
-														🔄 Retry Analysis
-													</Button>
+													<p className="text-sm text-red-700 mb-3 break-words whitespace-pre-wrap">{apiError}</p>
+													<div className="flex flex-col space-y-2">
+														<Button
+															variant="secondary"
+															size="sm"
+															onClick={() => performRealTimeAnalysis(watchedFields)}
+															disabled={isAnalyzing}
+															className="w-full"
+														>
+															🔄 Retry Analysis
+														</Button>
+														{!isOnline && (
+															<p className="text-xs text-red-600">
+																💡 Try the Standard form for better offline performance
+															</p>
+														)}
+													</div>
 												</div>
 											)}
 
-											{/* No Analysis State - Compact */}
+											{/* No Analysis State - Connection Aware */}
 											{!aiAnalysis && !isAnalyzing && !apiError && (
 												<div className="text-center py-6 text-gray-500">
 													<div className="text-3xl mb-2">🏥</div>
-													<h3 className="text-sm font-medium text-gray-700 mb-1">AI Support Ready</h3>
+													<h3 className="text-sm font-medium text-gray-700 mb-1">
+														{!isOnline ? 'Limited AI Support (Offline)' :
+															statusInfo.isSlowConnection ? 'AI Support Ready (Slow Connection)' :
+																'AI Support Ready'}
+													</h3>
 													<p className="text-xs text-gray-600 mb-1">
-														Analysis will appear as you complete the assessment
+														{!isOnline ? 'Local guidelines and rules available' :
+															statusInfo.isSlowConnection ? 'Analysis may be slower than usual' :
+																'Analysis will appear as you complete the assessment'}
 													</p>
 													<p className="text-xs text-gray-500">
 														Start with chief complaint or symptoms
