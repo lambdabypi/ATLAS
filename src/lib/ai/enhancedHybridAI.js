@@ -5,6 +5,7 @@ import { getPracticalLocalRecommendations, getPracticalLocalStatus } from './pra
 import { getClinicalRecommendations as getGeminiRecommendations, getModelStatus } from './gemini';
 import { getClinicalRAGRecommendations, initializeClinicalRAG } from './clinicalRAGSystem';
 import { getRelevantGuidelines } from '../db/expandedGuidelines';
+import { networkDetector, addNetworkListener } from '../utils/networkDetection';
 
 // FIXED: Updated configuration prioritizing RAG when offline
 const HYBRID_CONFIG = {
@@ -53,25 +54,23 @@ class EnhancedHybridManager {
 			}
 		};
 
-		this.isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+		this.isOnline = networkDetector.getOnlineStatus();
 		this.lastSelection = null;
 		this.ragInitialized = false;
 		this.ragInitializing = false;
 		this.ragSystemInstance = null;
 
 		// Listen for connectivity changes
-		if (typeof window !== 'undefined') {
-			window.addEventListener('online', () => {
-				this.isOnline = true;
-				console.log('🌐 Connection restored - Gemini now preferred');
-			});
-			window.addEventListener('offline', () => {
-				this.isOnline = false;
-				console.log('📱 Offline mode - RAG system now preferred');  // UPDATED MESSAGE
-			});
+		this.networkUnsubscribe = addNetworkListener((online) => {
+			this.isOnline = online;
+			if (online) {
+				console.log('🌐 Network restored - Gemini now preferred');
+			} else {
+				console.log('📱 Network lost - RAG system now preferred');
+			}
+		});
 
-			this.autoInitializeRAG();
-		}
+		this.autoInitializeRAG();
 
 		console.log('🤖 Enhanced Hybrid Manager initialized (RAG-first when offline)');
 	}
