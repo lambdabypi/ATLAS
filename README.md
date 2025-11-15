@@ -925,9 +925,9 @@ MIT License - See [LICENSE](LICENSE) file for details
 ## 📞 Contact
 
 **Project Maintainer**: Shreyas Sreenivas  
-**Email**: sreenivas.sh@northeastern.edu  
-**GitHub**: [@yourusername](https://github.com/yourusername)  
-**Project Link**: [https://github.com/yourusername/atlas](https://github.com/yourusername/atlas)
+**Email**: sreenivas.s@northeastern.edu  
+**GitHub**: [@lambdabypi](https://github.com/lambdabypi)  
+**Project Link**: [https://github.com/lambdabypi/atlas](https://github.com/lambdabypi/ATLAS)
 
 ---
 
