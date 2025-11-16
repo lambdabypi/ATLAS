@@ -1,4 +1,5 @@
 // src/lib/utils/networkDetection.js - SSR-Safe robust network connectivity detection
+// FIXED: Don't treat API rate limits (429) as network errors
 export class NetworkDetector {
 	constructor() {
 		// SSR-safe initialization
@@ -43,12 +44,17 @@ export class NetworkDetector {
 		window.fetch = async (...args) => {
 			try {
 				const response = await originalFetch(...args);
-				if (!response.ok && this.isNetworkError(response.status)) {
+
+				// ✅ ONLY treat actual network errors (0 status), not API errors like 429
+				// Status 0 = network failure, 429/403/401/etc = API errors (not network problems)
+				if (!response.ok && response.status === 0) {
 					this.handleNetworkError();
 				}
+
 				return response;
 			} catch (error) {
-				if (this.isNetworkError(error)) {
+				// ✅ Only handle TRUE network errors, not API errors
+				if (this.isTrueNetworkError(error)) {
 					this.handleNetworkError();
 				}
 				throw error;
@@ -56,19 +62,54 @@ export class NetworkDetector {
 		};
 	}
 
+	// ✅ NEW: More strict network error detection that excludes API errors
+	isTrueNetworkError(error) {
+		if (!error || !error.message) return false;
+
+		const message = error.message.toLowerCase();
+
+		// These are TRUE network errors
+		const networkErrorPatterns = [
+			'failed to fetch',
+			'network request failed',
+			'internet disconnected',
+			'connection refused',
+			'net::err',
+			'network error'
+		];
+
+		// These are NOT network errors - they're API/application errors
+		// Don't treat rate limits, quotas, or auth errors as network problems
+		const notNetworkErrors = [
+			'quota',
+			'rate limit',
+			'429',
+			'resource_exhausted',
+			'forbidden',
+			'unauthorized',
+			'apierror',
+			'exceeded your current quota'
+		];
+
+		// If it mentions API errors, it's NOT a network error
+		if (notNetworkErrors.some(pattern => message.includes(pattern))) {
+			return false;
+		}
+
+		// Check if it's a real network error
+		return networkErrorPatterns.some(pattern => message.includes(pattern));
+	}
+
 	isNetworkError(errorOrStatus) {
 		// Check for common network error patterns
 		if (typeof errorOrStatus === 'number') {
-			return errorOrStatus === 0; // Network error usually returns 0
+			// Only status 0 indicates a true network error
+			// 429, 403, 401, 500, etc. are API/server errors, not network errors
+			return errorOrStatus === 0;
 		}
 
 		if (errorOrStatus && errorOrStatus.message) {
-			const message = errorOrStatus.message.toLowerCase();
-			return message.includes('failed to fetch') ||
-				message.includes('network error') ||
-				message.includes('internet disconnected') ||
-				message.includes('connection refused') ||
-				message.includes('timeout');
+			return this.isTrueNetworkError(errorOrStatus);
 		}
 
 		return false;
