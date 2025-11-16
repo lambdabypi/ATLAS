@@ -202,13 +202,18 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	}, [patientId, setValue]);
 
 	// 🎯 ENHANCED REAL-TIME CLINICAL ANALYSIS WITH CONNECTION AWARENESS
+	// 🎯 ENHANCED REAL-TIME CLINICAL ANALYSIS - FIXED to prevent loops
 	const performRealTimeAnalysis = useCallback(async (formData) => {
 		if (!formData.chiefComplaint && !formData.symptoms && !formData.presentingComplaint) {
 			return;
 		}
 
+		// Read current values inside the function instead of from dependencies
+		const currentStatusInfo = getStatusInfo();
+		const currentIsOnline = isOnline;
+
 		// Don't start analysis if offline and no local capabilities
-		if (!isOnline && !systemStatus.models?.clinicalRAG?.available) {
+		if (!currentIsOnline && !systemStatus.models?.clinicalRAG?.available) {
 			console.log('Skipping AI analysis - offline and no local capabilities');
 			return;
 		}
@@ -248,14 +253,14 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 
 			setAnalysisProgress(80);
 
-			// 🎯 CONNECTION-AWARE AI OPTIONS
+			// 🎯 CONNECTION-AWARE AI OPTIONS (read fresh)
 			const analysisOptions = {
-				modelPreference: !isOnline ? 'local-only' :
-					statusInfo.isSlowConnection ? 'prefer-local' : modelPreference,
-				maxRetries: statusInfo.isSlowConnection ? 1 : 2,
+				modelPreference: !currentIsOnline ? 'local-only' :
+					currentStatusInfo.isSlowConnection ? 'prefer-local' : modelPreference,
+				maxRetries: currentStatusInfo.isSlowConnection ? 1 : 2,
 				fallbackToRules: true,
 				fullContent: true,
-				timeoutMs: statusInfo.isSlowConnection ? 30000 : 10000 // Longer timeout for slow connections
+				timeoutMs: currentStatusInfo.isSlowConnection ? 30000 : 10000
 			};
 
 			// Get enhanced clinical recommendations
@@ -285,9 +290,9 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 			setAiAnalysis({
 				...response,
 				timestamp: new Date(),
-				isOffline: !isOnline,
-				connectionType: statusInfo.connectionType,
-				isSlowConnection: statusInfo.isSlowConnection,
+				isOffline: !currentIsOnline,
+				connectionType: currentStatusInfo.connectionType,
+				isSlowConnection: currentStatusInfo.isSlowConnection,
 				clinicalFlags: newFlags,
 				guidelinesUsed: guidelines.length,
 				systemStatus: await getEnhancedSystemStatus()
@@ -296,11 +301,14 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 		} catch (error) {
 			console.error('Analysis failed:', error);
 
-			// 🎯 CONNECTION-AWARE ERROR MESSAGES
+			// Read status info fresh for error message
+			const currentStatusInfo = getStatusInfo();
+			const currentIsOnline = isOnline;
+
 			let errorMessage = `Analysis failed: ${error.message}`;
-			if (!isOnline) {
+			if (!currentIsOnline) {
 				errorMessage += '\n\nWorking offline - only local guidelines and rules available.';
-			} else if (statusInfo.isSlowConnection) {
+			} else if (currentStatusInfo.isSlowConnection) {
 				errorMessage += '\n\nSlow connection detected - try the Standard form for better performance.';
 			}
 
@@ -312,9 +320,9 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				confidence: CONFIDENCE_LEVELS.VERY_LOW,
 				selectedModel: 'error-fallback',
 				isError: true,
-				isOffline: !isOnline,
-				connectionType: statusInfo.connectionType,
-				isSlowConnection: statusInfo.isSlowConnection
+				isOffline: !currentIsOnline,
+				connectionType: currentStatusInfo.connectionType,
+				isSlowConnection: currentStatusInfo.isSlowConnection
 			});
 		} finally {
 			setTimeout(() => {
@@ -322,7 +330,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				setAnalysisProgress(0);
 			}, 500);
 		}
-	}, [patient, isOnline, statusInfo, modelPreference, systemStatus]);
+	}, [patient, modelPreference]); // ✅ Only stable dependencies
 
 	// Helper functions for clinical assessment
 	const detectDangerSigns = (formData) => {
@@ -448,17 +456,28 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 	useEffect(() => {
 		const hasData = watchedFields.chiefComplaint || watchedFields.symptoms || watchedFields.presentingComplaint;
 
-		if (hasData) {
-			// Longer delay for slow connections to avoid overloading
-			const delay = statusInfo.isSlowConnection ? 5000 : 3000;
-
-			const timeoutId = setTimeout(() => {
-				performRealTimeAnalysis(watchedFields);
-			}, delay);
-
-			return () => clearTimeout(timeoutId);
+		// Don't trigger if no data or already analyzing
+		if (!hasData || isAnalyzing) {
+			return;
 		}
-	}, [watchedFields.chiefComplaint, watchedFields.symptoms, watchedFields.presentingComplaint, watchedFields.generalAppearance, performRealTimeAnalysis, statusInfo.isSlowConnection]);
+
+		// Read status info fresh instead of from dependency
+		const currentStatusInfo = getStatusInfo();
+		const delay = currentStatusInfo.isSlowConnection ? 5000 : 3000;
+
+		const timeoutId = setTimeout(() => {
+			performRealTimeAnalysis(watchedFields);
+		}, delay);
+
+		return () => clearTimeout(timeoutId);
+	}, [
+		watchedFields.chiefComplaint,
+		watchedFields.symptoms,
+		watchedFields.presentingComplaint,
+		watchedFields.generalAppearance,
+		isAnalyzing,
+		performRealTimeAnalysis // Now safe because it only changes when patient/modelPreference change
+	]);
 
 	// Form submission
 	const onSubmit = useCallback(async (data) => {
