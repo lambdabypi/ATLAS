@@ -136,7 +136,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	// Watch all form fields
 	const watchedFields = watch();
 
-	// 🎯 SYSTEM STATUS MONITORING WITH CONNECTION AWARENESS
+	// 🎯 SYSTEM STATUS MONITORING - FIXED to prevent infinite loop
 	const updateSystemStatus = useCallback(async () => {
 		try {
 			const status = await getEnhancedSystemStatus();
@@ -164,7 +164,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				hybrid: { enabled: true }
 			});
 		}
-	}, [isOnline, getStatusInfo]);
+	}, [isOnline]); // ✅ ONLY isOnline - removed getStatusInfo
 
 	useEffect(() => {
 		updateSystemStatus();
