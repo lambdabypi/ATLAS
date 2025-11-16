@@ -142,12 +142,15 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 			const status = await getEnhancedSystemStatus();
 			setSystemStatus(status);
 
+			// Get current connection status for logging only (not a dependency)
+			const currentStatusInfo = getStatusInfo();
+
 			console.log('🤖 Enhanced System Status:', {
 				ragAvailable: status.models?.clinicalRAG?.available,
 				ragGuidelineCount: status.models?.clinicalRAG?.guidelineCount,
 				geminiAvailable: status.models?.gemini?.available,
 				hybridEnabled: status.hybrid?.enabled,
-				connectionStatus: statusInfo.statusText
+				connectionStatus: currentStatusInfo.statusText
 			});
 		} catch (error) {
 			console.warn('Could not get system status:', error);
@@ -156,12 +159,12 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				models: {
 					localAI: { available: true },
 					clinicalRAG: { available: true, guidelineCount: 15 },
-					gemini: { available: isOnline } // Only available when online
+					gemini: { available: isOnline }
 				},
 				hybrid: { enabled: true }
 			});
 		}
-	}, [isOnline, statusInfo]);
+	}, [isOnline, getStatusInfo]);
 
 	useEffect(() => {
 		updateSystemStatus();
@@ -1134,7 +1137,7 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 													{/* Connection Status Alert */}
 													{(aiAnalysis.isOffline || aiAnalysis.isSlowConnection) && (
 														<div className={`p-3 rounded-lg border text-sm ${aiAnalysis.isOffline ? 'bg-amber-50 border-amber-200 text-amber-800' :
-																'bg-yellow-50 border-yellow-200 text-yellow-800'
+															'bg-yellow-50 border-yellow-200 text-yellow-800'
 															}`}>
 															<div className="flex items-center">
 																<span className="mr-2">
