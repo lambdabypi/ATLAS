@@ -1,21 +1,21 @@
-// src/components/consultation/EnhancedConsultationForm.jsx - UPDATED WITH CENTRALIZED ONLINE STATUS
+// src/components/consultation/EnhancedConsultationForm.jsx - FULLY FIXED
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { getEnhancedClinicalRecommendations, getEnhancedSystemStatus } from '../../lib/ai/enhancedHybridAI';
 import { AIAnalysisDisplay } from '../ui/AIAnalysisDisplay';
 import { CONFIDENCE_LEVELS } from '../../lib/constants/clinicalConstants.js';
 import { getRelevantGuidelines, seedExpandedGuidelines } from '../../lib/db/expandedGuidelines';
 import { patientDb, consultationDb, medicalDb } from '../../lib/db';
-import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus'; // 🎯 CENTRALIZED HOOK
+import { useOnlineStatus } from '../../lib/hooks/useOnlineStatus';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { TextArea } from '../ui/TextArea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Badge } from '../ui/Badge';
-import ConnectionStatus from '../ui/ConnectionStatus'; // 🎯 REUSABLE COMPONENT
+import ConnectionStatus from '../ui/ConnectionStatus';
 
 export default function EnhancedConsultationForm({ patientId, onConsultationComplete }) {
 	const [patient, setPatient] = useState(null);
@@ -62,6 +62,10 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 		chronicCondition: false,
 		followUpRequired: false
 	});
+
+	// ✅ NEW: Refs to prevent duplicate analyses
+	const analysisTimeoutRef = useRef(null);
+	const lastAnalyzedDataRef = useRef(null);
 
 	const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
 		defaultValues: {
@@ -164,7 +168,7 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 				hybrid: { enabled: true }
 			});
 		}
-	}, [isOnline]); // ✅ ONLY isOnline - removed getStatusInfo
+	}, [isOnline]); // ✅ Only isOnline - removed getStatusInfo
 
 	useEffect(() => {
 		updateSystemStatus();
@@ -201,7 +205,6 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 		loadPatientData();
 	}, [patientId, setValue]);
 
-	// 🎯 ENHANCED REAL-TIME CLINICAL ANALYSIS WITH CONNECTION AWARENESS
 	// 🎯 ENHANCED REAL-TIME CLINICAL ANALYSIS - FIXED to prevent loops
 	const performRealTimeAnalysis = useCallback(async (formData) => {
 		if (!formData.chiefComplaint && !formData.symptoms && !formData.presentingComplaint) {
@@ -364,11 +367,14 @@ export default function EnhancedConsultationForm({ patientId, onConsultationComp
 	};
 
 	const constructComprehensiveQuery = (formData, patient) => {
+		const currentStatusInfo = getStatusInfo();
+		const currentIsOnline = isOnline;
+
 		let query = `COMPREHENSIVE CLINICAL ASSESSMENT
 
-CONNECTION STATUS: ${statusInfo.statusText}
-${!isOnline ? 'OFFLINE MODE - Using local guidelines and rules only' : ''}
-${statusInfo.isSlowConnection ? 'SLOW CONNECTION - Prioritize essential recommendations' : ''}
+CONNECTION STATUS: ${currentStatusInfo.statusText}
+${!currentIsOnline ? 'OFFLINE MODE - Using local guidelines and rules only' : ''}
+${currentStatusInfo.isSlowConnection ? 'SLOW CONNECTION - Prioritize essential recommendations' : ''}
 
 PATIENT PROFILE:
 - Age: ${patient?.age || 'Unknown'} years
@@ -399,7 +405,7 @@ CLINICAL CONTEXT:
 - Allergies: ${formData.allergies || 'NKDA'}
 - Risk Factors: ${formData.riskFactors || 'Not assessed'}
 
-Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clinical analysis including:
+Please provide ${currentStatusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clinical analysis including:
 1. Clinical Assessment and Differential Diagnosis
 2. WHO Guideline-based Management Recommendations  
 3. Medication Dosages and Administration
@@ -452,7 +458,7 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 		{ id: 'advanced', label: 'Advanced', icon: '🎯' }
 	];
 
-	// Debounced analysis trigger with connection awareness
+	// ✅ FIXED: Debounced analysis trigger with deduplication
 	useEffect(() => {
 		const hasData = watchedFields.chiefComplaint || watchedFields.symptoms || watchedFields.presentingComplaint;
 
@@ -461,22 +467,47 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 			return;
 		}
 
+		// Create a hash of the current data to check if it changed
+		const currentDataHash = JSON.stringify({
+			cc: watchedFields.chiefComplaint,
+			s: watchedFields.symptoms,
+			pc: watchedFields.presentingComplaint,
+			ga: watchedFields.generalAppearance
+		});
+
+		// Don't re-analyze if data hasn't changed
+		if (lastAnalyzedDataRef.current === currentDataHash) {
+			return;
+		}
+
+		// Clear any pending analysis
+		if (analysisTimeoutRef.current) {
+			clearTimeout(analysisTimeoutRef.current);
+		}
+
 		// Read status info fresh instead of from dependency
 		const currentStatusInfo = getStatusInfo();
 		const delay = currentStatusInfo.isSlowConnection ? 5000 : 3000;
 
-		const timeoutId = setTimeout(() => {
+		analysisTimeoutRef.current = setTimeout(() => {
+			lastAnalyzedDataRef.current = currentDataHash;
 			performRealTimeAnalysis(watchedFields);
+			analysisTimeoutRef.current = null;
 		}, delay);
 
-		return () => clearTimeout(timeoutId);
+		return () => {
+			if (analysisTimeoutRef.current) {
+				clearTimeout(analysisTimeoutRef.current);
+				analysisTimeoutRef.current = null;
+			}
+		};
 	}, [
 		watchedFields.chiefComplaint,
 		watchedFields.symptoms,
 		watchedFields.presentingComplaint,
 		watchedFields.generalAppearance,
 		isAnalyzing,
-		performRealTimeAnalysis // Now safe because it only changes when patient/modelPreference change
+		performRealTimeAnalysis
 	]);
 
 	// Form submission
@@ -605,7 +636,7 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 		);
 	}
 
-	// Clinical section rendering function (same as before, but with connection-aware hints)
+	// Clinical section rendering function
 	const renderClinicalSection = () => {
 		switch (activeSection) {
 			case 'presenting-complaint':
@@ -613,7 +644,6 @@ Please provide ${statusInfo.isSlowConnection ? 'concise' : 'comprehensive'} clin
 					<div className="space-y-6">
 						<h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
 							Presenting Complaint
-							{/* 🎯 CONNECTION-AWARE HINTS */}
 							{!isOnline && (
 								<span className="text-sm font-normal text-amber-600 ml-2">(Offline - AI limited)</span>
 							)}

@@ -1,5 +1,4 @@
-// src/lib/utils/networkDetection.js - SSR-Safe robust network connectivity detection
-// FIXED: Don't treat API rate limits (429) as network errors
+// src/lib/utils/networkDetection.js - FULLY FIXED
 export class NetworkDetector {
 	constructor() {
 		// SSR-safe initialization
@@ -39,22 +38,38 @@ export class NetworkDetector {
 			this.setOnlineStatus(false);
 		});
 
-		// Listen for failed fetch requests as an indicator
+		// ✅ FIXED: Listen for failed fetch requests BUT ONLY for API calls
 		const originalFetch = window.fetch;
 		window.fetch = async (...args) => {
+			const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+
 			try {
 				const response = await originalFetch(...args);
 
-				// ✅ ONLY treat actual network errors (0 status), not API errors like 429
-				// Status 0 = network failure, 429/403/401/etc = API errors (not network problems)
-				if (!response.ok && response.status === 0) {
+				// ✅ Only check network status for API calls, not for assets/manifests/service workers
+				const isApiCall = url && (
+					url.includes('api.') ||
+					url.includes('/api/') ||
+					url.includes('generativelanguage.googleapis.com') ||
+					url.includes('googleapis.com')
+				);
+
+				// ✅ Only trigger network check for TRUE network failures (status 0) on API calls
+				if (isApiCall && !response.ok && response.status === 0) {
 					this.handleNetworkError();
 				}
 
 				return response;
 			} catch (error) {
-				// ✅ Only handle TRUE network errors, not API errors
-				if (this.isTrueNetworkError(error)) {
+				// ✅ Only handle TRUE network errors on API calls
+				const isApiCall = url && (
+					url.includes('api.') ||
+					url.includes('/api/') ||
+					url.includes('generativelanguage.googleapis.com') ||
+					url.includes('googleapis.com')
+				);
+
+				if (isApiCall && this.isTrueNetworkError(error)) {
 					this.handleNetworkError();
 				}
 				throw error;
