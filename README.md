@@ -53,12 +53,13 @@ ATLAS bridges this gap by providing:
                           ↓
 ┌─────────────────────────────────────────────────────────┐
 │           Data Persistence Layer                        │
-│  IndexedDB (Client) • SQLite (Server) • Dexie.js ORM   │
+│  IndexedDB (Client-Side Only) • Dexie.js ORM           │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
 │           Synchronization Layer                         │
 │  Offline Queue • Smart Sync • Background Sync API      │
+│        (Built but not currently used)                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -81,6 +82,16 @@ Clinical Query
 2. **Secondary**: Clinical RAG with Embeddings (offline, 180ms avg)
 3. **Tertiary**: Rule-based Emergency Protocols
 
+### Current Architecture Status
+
+⚠️ **Important**: ATLAS currently operates as a **100% client-side PWA**:
+- ✅ All data stored in browser IndexedDB (no server database usage)
+- ✅ All AI processing through direct client → Gemini API calls
+- ✅ Complete offline functionality through local storage
+- 🔧 Backend API built but **not actively used** (ready for future sync features)
+
+This design enables the 95% offline reliability and ensures healthcare workflow continuity regardless of server availability.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -90,9 +101,12 @@ Clinical Query
 Node.js >= 18.0.0
 npm >= 9.0.0
 
-# Optional (for backend)
+# For Evaluation & Testing
+Python >= 3.9 (for validation framework)
+R >= 4.0 (for statistical analysis)
+
+# Optional (for backend - currently unused)
 SQLite3
-Python >= 3.9 (for future analytics integration)
 ```
 
 ### Installation
@@ -105,7 +119,12 @@ cd atlas
 # Install frontend dependencies
 npm install
 
-# Install backend dependencies
+# Install Python evaluation dependencies
+cd evaluation
+pip install -r requirements.txt
+cd ..
+
+# Optional: Install backend dependencies (for future sync features)
 cd atlas-backend
 npm install
 cd ..
@@ -116,34 +135,31 @@ cd ..
 Create `.env.local` in the project root:
 
 ```env
-# Google Gemini API
+# Google Gemini API (Required)
 NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
 
-# Backend API (development)
+# Backend API (Optional - not currently used)
 NEXT_PUBLIC_API_URL=http://localhost:3001
-
-# Database (backend)
-DATABASE_PATH=./data/atlas.db
 
 # Service Worker (production)
 NEXT_PUBLIC_SW_ENABLED=true
 
 # Feature Flags
 NEXT_PUBLIC_ENABLE_VOICE_INPUT=false
-NEXT_PUBLIC_ENABLE_OFFLINE_SYNC=true
+NEXT_PUBLIC_ENABLE_OFFLINE_SYNC=false
 ```
 
 ### Development
 
 ```bash
-# Terminal 1: Start frontend (Next.js)
+# Start frontend (main application)
 npm run dev
 # Access at http://localhost:3000
 
-# Terminal 2: Start backend (Express)
+# Optional: Start backend (for future sync features)
 cd atlas-backend
 npm start
-# API runs at http://localhost:3001
+# API runs at http://localhost:3001 (not used by frontend)
 ```
 
 ### Production Build
@@ -153,10 +169,7 @@ npm start
 npm run build
 npm start
 
-# Build backend
-cd atlas-backend
-npm run build
-npm run start:prod
+# Backend is optional for current functionality
 ```
 
 ## 📁 Project Structure
@@ -208,12 +221,12 @@ src/
 │   ├── clinical/                 # Clinical knowledge
 │   │   ├── clinicalKnowledgeDatabase.js
 │   │   └── smartGuidelines.js
-│   ├── db/                       # Database layer
+│   ├── db/                       # Database layer (IndexedDB only)
 │   │   ├── index.js             # Dexie.js setup
 │   │   ├── patients.js          # Patient CRUD
 │   │   ├── consultations.js     # Consultation CRUD
 │   │   └── reference.js         # Guidelines storage
-│   ├── sync/                     # Synchronization
+│   ├── sync/                     # Synchronization (future use)
 │   │   ├── consultation-sync.js
 │   │   ├── patient-sync.js
 │   │   └── prioritized-sync.js
@@ -225,11 +238,11 @@ src/
     └── globals.css
 ```
 
-### Backend (`/atlas-backend`)
+### Backend (`/atlas-backend`) - Built but Unused
 
 ```
 atlas-backend/
-├── routes/                       # API routes
+├── routes/                       # API routes (ready for future sync)
 │   ├── auth.js                   # Authentication endpoints
 │   ├── consultations.js          # Consultation CRUD
 │   ├── patients.js               # Patient CRUD
@@ -247,6 +260,44 @@ atlas-backend/
 └── server.js                     # Express server
 ```
 
+### Evaluation Framework (`/evaluation`)
+
+```
+evaluation/
+├── config/                       # Test configuration
+│   └── test_config.json         # Evaluation parameters
+│
+├── data/                         # Evaluation datasets
+│   ├── expert_surveys/           # Clinical expert assessments
+│   ├── framework_assessments/    # NASSS & RE-AIM evaluations
+│   └── synthetic_scenarios/      # WHO-aligned test cases
+│
+├── results/                      # Evaluation outputs
+│   ├── clinical_validation/      # Clinical reasoning results
+│   ├── performance_metrics/      # Technical performance data
+│   └── reports/                  # Generated analysis reports
+│
+└── scripts/                      # Evaluation tools
+    ├── ai_testing_results.csv    # AI performance data
+    ├── atlas_data_analysis.py    # Main Python analysis
+    ├── atlas_evaluation_analysis.R # R statistical analysis
+    ├── atlas_live_testing.py     # Live system testing
+    ├── lighthouse_results.json   # PWA performance data
+    ├── test_scenarios.csv        # Test scenario definitions
+    │
+    ├── evaluation_results/       # Processed results
+    │   ├── atlas_evaluation_dashboard.png
+    │   ├── atlas_evaluation_report.json
+    │   ├── clinical_validation_results.csv
+    │   ├── nasss_assessment.csv
+    │   ├── performance_metrics.csv
+    │   └── reaim_assessment.csv
+    │
+    └── live_test_results/        # Live testing outputs
+        ├── atlas_live_test_report.json
+        └── test_summary.csv
+```
+
 ## 🔧 Core Technologies
 
 ### Frontend Stack
@@ -254,16 +305,27 @@ atlas-backend/
 - **UI Library**: React 18
 - **Styling**: Tailwind CSS
 - **State Management**: React Context + Hooks
-- **Client DB**: IndexedDB (via Dexie.js)
+- **Client DB**: IndexedDB (via Dexie.js) - **Primary data storage**
 - **PWA**: Service Workers + Cache API
 - **AI Client**: Google Gemini API SDK
 
-### Backend Stack
+### Backend Stack (Future Sync Features)
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: SQLite3
 - **ORM**: None (raw SQL for simplicity)
 - **API Style**: RESTful
+
+### Evaluation & Testing Stack
+- **Core Analysis**: Python 3.9+
+  - pandas, numpy for data analysis
+  - matplotlib, seaborn for visualization
+  - scikit-learn for statistical validation
+- **Statistical Analysis**: R 4.0+
+  - Advanced statistical modeling
+  - Research-grade analysis frameworks
+- **Performance Testing**: Lighthouse CI, Jest
+- **Clinical Validation**: Custom WHO-aligned scenario framework
 
 ### AI/ML Stack
 - **Online AI**: Google Gemini 2.5 Flash
@@ -273,7 +335,7 @@ atlas-backend/
 
 ## 💾 Data Architecture
 
-### IndexedDB Schema (Client-Side)
+### IndexedDB Schema (Client-Side Only - Primary Storage)
 
 ```javascript
 // Dexie.js Schema Definition
@@ -282,15 +344,17 @@ db.version(1).stores({
   patients: 'patientId, name, uhid, dateOfBirth, lastModified',
   consultations: 'consultationId, patientId, date, providerId, lastModified',
   guidelines: 'guidelineId, category, domain, title',
-  syncQueue: '++id, timestamp, priority, type, status'
+  syncQueue: '++id, timestamp, priority, type, status'  // Future use
 });
 ```
 
 **Storage Capacity**: 50% of available disk space per origin (browser-dependent)
+**Persistence**: Managed by StoragePersistenceManager for reliability across browser sessions
 
-### SQLite Schema (Server-Side)
+### SQLite Schema (Server-Side - Future Sync Only)
 
 ```sql
+-- Built but currently unused - ready for multi-user deployment
 -- Patients Table
 CREATE TABLE patients (
   patient_id TEXT PRIMARY KEY,
@@ -317,18 +381,6 @@ CREATE TABLE consultations (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
-);
-
--- Clinical Guidelines Table
-CREATE TABLE guidelines (
-  guideline_id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  category TEXT,
-  domain TEXT,
-  content TEXT,
-  who_protocol_id TEXT,
-  version TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -444,67 +496,7 @@ function generateResponse(query, retrievedDocs) {
 | Response Generation | 12ms | 25ms | <50ms |
 | **Total Query** | **55ms** | **120ms** | **<300ms** |
 
-## 🔄 Synchronization Strategy
-
-### Current Implementation: Last-Write-Wins
-
-```javascript
-// lib/sync/consultation-sync.js
-async function syncConsultations() {
-  const queue = await db.syncQueue
-    .where('type').equals('consultation')
-    .and(item => item.status === 'pending')
-    .toArray();
-  
-  for (const item of queue) {
-    try {
-      const response = await fetch('/api/consultations', {
-        method: 'POST',
-        body: JSON.stringify(item.data),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.ok) {
-        await db.syncQueue.delete(item.id);
-      } else {
-        // Retry with exponential backoff
-        await scheduleRetry(item);
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-    }
-  }
-}
-```
-
-### Future Enhancement: CRDT-Based Sync
-
-```javascript
-// Planned: lib/sync/crdt-healthcare.js
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
-
-class CRDTConsultation {
-  constructor(consultationId) {
-    this.doc = new Y.Doc();
-    this.consultation = this.doc.getMap('consultation');
-    
-    // Automatic conflict resolution
-    this.provider = new WebsocketProvider(
-      'wss://atlas-sync.example.com',
-      consultationId,
-      this.doc
-    );
-  }
-  
-  updateField(field, value) {
-    // Guaranteed conflict-free merge
-    this.consultation.set(field, value);
-  }
-}
-```
-
-## 🧪 Testing
+## 🧪 Testing & Evaluation
 
 ### Automated Testing Suite
 
@@ -516,7 +508,6 @@ npm test
 npm test -- --grep "PWA"          # PWA functionality
 npm test -- --grep "AI"           # AI integration
 npm test -- --grep "Offline"      # Offline capabilities
-npm test -- --grep "Sync"         # Synchronization
 
 # Performance benchmarks
 npm run benchmark
@@ -525,27 +516,53 @@ npm run benchmark
 npm run lighthouse
 ```
 
-### Clinical Scenario Testing
+### Python-Based Clinical Evaluation
 
 ```bash
-# Generate synthetic test data
-npm run generate:test-data
+# Navigate to evaluation directory
+cd evaluation
 
-# Run clinical validation
-npm run test:clinical
+# Run comprehensive clinical validation
+python scripts/atlas_live_testing.py
 
-# WHO alignment validation
-npm run test:who-alignment
+# Generate evaluation dashboard
+python scripts/atlas_data_analysis.py
+
+# Run statistical analysis
+Rscript scripts/atlas_evaluation_analysis.R
+
+# Generate performance reports
+python scripts/atlas_data_analysis.py --generate-report
+```
+
+### Clinical Scenario Testing
+
+The evaluation framework includes comprehensive WHO-aligned clinical validation:
+
+- **90 synthetic clinical scenarios** across 4 domains
+- **Automated WHO protocol alignment scoring**
+- **Clinical appropriateness assessment**
+- **Resource awareness validation**
+- **Safety protocol verification**
+
+```python
+# Example Python evaluation script usage
+from scripts.atlas_live_testing import ClinicalEvaluator
+
+evaluator = ClinicalEvaluator()
+results = evaluator.run_comprehensive_evaluation()
+print(f"WHO Alignment: {results['who_alignment']}")
+print(f"Clinical Safety: {results['safety_score']}")
 ```
 
 ### Test Coverage
 
-| Component | Unit Tests | Integration Tests | E2E Tests |
-|-----------|------------|-------------------|-----------|
-| AI System | ✅ 85% | ✅ 78% | ✅ 65% |
-| Data Persistence | ✅ 92% | ✅ 88% | ✅ 75% |
-| Sync Logic | ✅ 88% | ✅ 72% | ⚠️ 45% |
-| UI Components | ✅ 76% | ⚠️ 55% | ⚠️ 40% |
+| Component | Unit Tests | Integration Tests | Clinical Evaluation |
+|-----------|------------|-------------------|-------------------|
+| AI System | ✅ 85% | ✅ 78% | ✅ 80% WHO Alignment |
+| Data Persistence | ✅ 92% | ✅ 88% | ✅ 99.97% Reliability |
+| Offline Functionality | ✅ 88% | ✅ 95% | ✅ 95% Uptime |
+| UI Components | ✅ 76% | ⚠️ 65% | ✅ Clinical Workflow Validated |
 
 ## 🔐 Security Considerations
 
@@ -554,9 +571,9 @@ npm run test:who-alignment
 - ✅ HTTPS-only in production
 - ✅ Environment variable protection
 - ✅ Input validation and sanitization
-- ✅ SQL injection prevention (parameterized queries)
 - ✅ XSS protection (React auto-escaping)
 - ✅ CORS configuration
+- ✅ Client-side data encryption
 
 ### Planned Enhancements
 
@@ -567,34 +584,6 @@ npm run test:who-alignment
 - ⚠️ Role-based access control (RBAC)
 - ⚠️ HIPAA compliance measures
 
-### Security Headers
-
-```javascript
-// next.config.js
-const securityHeaders = [
-  {
-    key: 'X-DNS-Prefetch-Control',
-    value: 'on'
-  },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload'
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN'
-  },
-  {
-    key: 'X-Content-Type-Options',
-    value: 'nosniff'
-  },
-  {
-    key: 'Referrer-Policy',
-    value: 'origin-when-cross-origin'
-  }
-];
-```
-
 ## 📈 Performance Optimization
 
 ### Service Worker Caching Strategy
@@ -604,7 +593,6 @@ const securityHeaders = [
 const CACHE_VERSION = 'atlas-v1.0.0';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
-const API_CACHE = `api-${CACHE_VERSION}`;
 
 // Cache-first for static assets
 self.addEventListener('fetch', (event) => {
@@ -623,21 +611,6 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
-
-// Network-first for API calls (with offline fallback)
-if (event.request.url.includes('/api/')) {
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const responseClone = response.clone();
-        caches.open(API_CACHE).then(cache => {
-          cache.put(event.request, responseClone);
-        });
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
-}
 ```
 
 ### Database Optimization
@@ -673,8 +646,6 @@ vercel --prod
 
 # Environment variables (set in Vercel dashboard)
 NEXT_PUBLIC_GEMINI_API_KEY
-NEXT_PUBLIC_API_URL
-DATABASE_PATH
 ```
 
 ### Docker Deployment
@@ -703,40 +674,6 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-```bash
-# Build and run
-docker build -t atlas .
-docker run -p 3000:3000 -e NEXT_PUBLIC_GEMINI_API_KEY=your_key atlas
-```
-
-### Self-Hosted Deployment
-
-```bash
-# Build for production
-npm run build
-
-# Start with PM2 (process manager)
-npm install -g pm2
-pm2 start npm --name "atlas" -- start
-pm2 startup
-pm2 save
-
-# Nginx reverse proxy configuration
-server {
-    listen 80;
-    server_name atlas.example.com;
-    
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
 ## 📊 Monitoring & Analytics
 
 ### Performance Monitoring
@@ -756,49 +693,23 @@ class PerformanceMonitor {
       }
     };
     
-    // Send to monitoring service (e.g., DataDog, New Relic)
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', name, {
-        event_category: 'Performance',
-        value: value,
-        ...tags
-      });
-    }
+    // Log to IndexedDB for offline analysis
+    this.storeMetricLocally(metric);
     
     // Also log to console in development
     if (process.env.NODE_ENV === 'development') {
       console.log('[Performance]', metric);
     }
   }
-  
-  static async measureAsync(name, fn) {
-    const start = performance.now();
-    try {
-      const result = await fn();
-      const duration = performance.now() - start;
-      this.logMetric(name, duration, { status: 'success' });
-      return result;
-    } catch (error) {
-      const duration = performance.now() - start;
-      this.logMetric(name, duration, { status: 'error' });
-      throw error;
-    }
-  }
 }
-
-// Usage
-const patients = await PerformanceMonitor.measureAsync(
-  'database.query.patients',
-  () => db.patients.toArray()
-);
 ```
 
 ### Custom Metrics
 
 - **Clinical Workflow Metrics**: Time to complete consultation, AI recommendation usage rate
-- **System Health**: Offline transition rate, sync success rate, error rates
+- **System Health**: Offline transition rate, cache hit rates, error rates  
 - **User Engagement**: Feature usage, guideline access patterns
-- **Performance**: Page load times, API response times, cache hit rates
+- **Performance**: Page load times, AI response times, offline reliability
 
 ## 🐛 Troubleshooting
 
@@ -862,9 +773,10 @@ async function callGeminiWithRetry(prompt, maxRetries = 3) {
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature/amazing-feature`
 3. Make changes and test thoroughly
-4. Commit with descriptive messages: `git commit -m 'Add amazing feature'`
-5. Push to branch: `git push origin feature/amazing-feature`
-6. Open Pull Request
+4. Run evaluation suite: `cd evaluation && python scripts/atlas_live_testing.py`
+5. Commit with descriptive messages: `git commit -m 'Add amazing feature'`
+6. Push to branch: `git push origin feature/amazing-feature`
+7. Open Pull Request
 
 ### Code Style
 
@@ -875,8 +787,9 @@ npm run lint
 # Format code
 npm run format
 
-# Type checking (if using TypeScript in future)
-npm run type-check
+# Run Python evaluation
+cd evaluation
+python scripts/atlas_data_analysis.py --validate
 ```
 
 ### Commit Conventions
@@ -890,6 +803,7 @@ docs: Update API documentation
 style: Format code with prettier
 refactor: Simplify RAG retrieval logic
 test: Add tests for consultation sync
+eval: Update clinical validation framework
 chore: Update dependencies
 ```
 

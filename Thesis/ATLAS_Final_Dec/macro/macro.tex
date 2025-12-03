@@ -1,0 +1,56 @@
+% macro/macro.tex
+% user defined macros for the ATLAS project proposal
+
+% Define convenient shortcuts
+\newcommand{\atlas}{ATLAS}
+\newcommand{\ie}{i.e.,}
+\newcommand{\eg}{e.g.,}
+\newcommand{\etc}{etc.}
+
+% Useful formatting commands
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\note}[1]{\textcolor{blue}{[NOTE: #1]}}
+
+% Technical terms
+\newcommand{\api}{\textsc{api}}
+\newcommand{\crdt}{\textsc{crdt}}
+\newcommand{\llm}{\textsc{llm}}
+\newcommand{\pwa}{\textsc{pwa}}
+\newcommand{\ui}{\textsc{ui}}
+\newcommand{\ux}{\textsc{ux}}
+
+% References to sections
+\newcommand{\secref}[1]{Section~\ref{#1}}
+\newcommand{\figref}[1]{Figure~\ref{#1}}
+\newcommand{\tabref}[1]{Table~\ref{#1}}
+\newcommand{\eqnref}[1]{Equation~\ref{#1}}
+\newcommand{\chapref}[1]{Chapter~\ref{#1}}
+\newcommand{\appref}[1]{Appendix~\ref{#1}}
+
+% Define useful shortcuts for common phrases
+\newcommand{\offline}{offline-first}
+\newcommand{\rls}{resource-limited settings}
+
+% Fix for margin issues
+\setlength{\textwidth}{6.0in}
+\setlength{\oddsidemargin}{0.2in}
+\setlength{\evensidemargin}{0.0in}
+\setlength{\topmargin}{0.0in}
+\setlength{\textheight}{8.0in}
+
+% Fix for float issues
+\renewcommand{\floatpagefraction}{0.7}
+\renewcommand{\topfraction}{0.8}
+\renewcommand{\bottomfraction}{0.5}
+\renewcommand{\textfraction}{0.1}
+\setcounter{totalnumber}{5}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+
+% Fix for table and figure issues
+\AtBeginDocument{
+  \renewcommand{\arraystretch}{1.2} % Increase space in tables
+}
+
+% Better paragraph spacing
+\setlength{\parskip}{0.5\baselineskip}
